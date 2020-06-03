@@ -2,7 +2,7 @@ pragma solidity 0.5.13;
 
 import "../interfaces/KyberNetwork.sol";
 import "../Utils.sol";
-import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "@openzeppelin/contracts/ownership/Ownable.sol";
 
 contract TestKyberNetwork is KyberNetwork, Utils(address(0), address(0), address(0)), Ownable {
   mapping(address => uint256) public priceInDAI;

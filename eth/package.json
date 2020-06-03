@@ -1,8 +1,8 @@
 {
     "dependencies": {
+        "@openzeppelin/contracts": "^2.5.0",
         "@truffle/hdwallet-provider": "^1.0.35",
         "bignumber.js": "^8.1.1",
-        "openzeppelin-solidity": "^2.4.0",
         "truffle-plugin-verify": "^0.3.5"
     },
     "devDependencies": {

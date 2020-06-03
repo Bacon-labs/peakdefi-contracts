@@ -1,12 +1,13 @@
 pragma solidity 0.5.13;
 
-import "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
-import "openzeppelin-solidity/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/access/roles/SignerRole.sol";
 import "../staking/PeakStaking.sol";
 
 
-contract PeakReward {
+contract PeakReward is SignerRole {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -60,7 +61,7 @@ contract PeakReward {
         @param user The user who is being referred
         @param referrer The referrer of `user`
      */
-    function refer(address user, address referrer) public {
+    function refer(address user, address referrer) public onlySigner {
         require(!isUser[user], "PeakReward: referred is already a user");
         require(user != referrer, "PeakReward: can't refer self");
         require(
@@ -94,7 +95,7 @@ contract PeakReward {
         address commissionToken,
         uint256 rawCommission,
         bool returnLeftovers
-    ) public regUser(referrer) returns (uint256 leftoverAmount) {
+    ) public regUser(referrer) onlySigner returns (uint256 leftoverAmount) {
         // transfer the raw commission from `msg.sender`
         IERC20 token = IERC20(commissionToken);
         token.safeTransferFrom(msg.sender, address(this), rawCommission);
@@ -140,6 +141,7 @@ contract PeakReward {
     function incrementCareerValueInDai(address user, uint256 incCV)
         public
         regUser(user)
+        onlySigner
     {
         careerValue[user] = careerValue[user].add(incCV);
     }
@@ -152,6 +154,7 @@ contract PeakReward {
     function incrementCareerValueInPeak(address user, uint256 incCVInPeak)
         public
         regUser(user)
+        onlySigner
     {
         uint256 peakPriceInDai = _getPeakPriceInDai();
         uint256 incCVInDai = incCVInPeak.mul(peakPriceInDai).div(

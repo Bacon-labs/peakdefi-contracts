@@ -1,7 +1,7 @@
 pragma solidity 0.5.13;
 
-import "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "openzeppelin-solidity/contracts/token/ERC20/ERC20Detailed.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20Detailed.sol";
 import "../interfaces/CERC20.sol";
 import "../interfaces/Comptroller.sol";
 

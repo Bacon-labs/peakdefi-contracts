@@ -25,7 +25,7 @@ pragma solidity 0.5.13;
 ///  affecting the original token
 /// @dev It is ERC20 compliant, but still needs to under go further testing.
 
-import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "@openzeppelin/contracts/ownership/Ownable.sol";
 import "./TokenController.sol";
 
 contract ApproveAndCallFallBack {
