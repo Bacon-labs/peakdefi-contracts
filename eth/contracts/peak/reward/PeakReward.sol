@@ -3,6 +3,7 @@ pragma solidity 0.5.13;
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/SafeERC20.sol";
+import "../staking/PeakStaking.sol";
 
 
 contract PeakReward {
@@ -27,17 +28,18 @@ contract PeakReward {
     uint256[] public commissionStakeRequirements;
 
     address public marketPeakWallet;
+    PeakStaking public peakStaking;
 
-    constructor(address _marketPeakWallet) public {
+    constructor(address _marketPeakWallet, address _peakStaking) public {
         // initialize commission percentages for each level
         commissionPercentages.push(10 * (10**16)); // 10%
-        commissionPercentages.push(4 * (10**16));  // 4%
-        commissionPercentages.push(2 * (10**16));  // 2%
-        commissionPercentages.push(1 * (10**16));  // 1%
-        commissionPercentages.push(1 * (10**16));  // 1%
-        commissionPercentages.push(1 * (10**16));  // 1%
-        commissionPercentages.push(5 * (10**15));  // 0.5%
-        commissionPercentages.push(5 * (10**15));  // 0.5%
+        commissionPercentages.push(4 * (10**16)); // 4%
+        commissionPercentages.push(2 * (10**16)); // 2%
+        commissionPercentages.push(1 * (10**16)); // 1%
+        commissionPercentages.push(1 * (10**16)); // 1%
+        commissionPercentages.push(1 * (10**16)); // 1%
+        commissionPercentages.push(5 * (10**15)); // 0.5%
+        commissionPercentages.push(5 * (10**15)); // 0.5%
 
         // initialize commission stake requirements for each level
         commissionStakeRequirements.push(0);
@@ -50,6 +52,7 @@ contract PeakReward {
         commissionStakeRequirements.push(PEAK_PRECISION.mul(10000));
 
         marketPeakWallet = _marketPeakWallet;
+        peakStaking = PeakStaking(_peakStaking);
     }
 
     /**
@@ -69,6 +72,14 @@ contract PeakReward {
         isUser[referrer] = true;
 
         referrerOf[user] = referrer;
+    }
+
+    function canRefer(address user, address referrer) public view returns (bool) {
+        return
+            !isUser[user] &&
+            user != referrer &&
+            user != address(0) &&
+            referrer != address(0);
     }
 
     /**
@@ -95,7 +106,9 @@ contract PeakReward {
         while (ptr != address(0) && i < COMMISSION_LEVELS) {
             if (_peakStakeOf(ptr) >= commissionStakeRequirements[i]) {
                 // referrer has enough stake, give commission
-                uint256 com = rawCommission.mul(commissionPercentages[i]).div(COMMISSION_RATE);
+                uint256 com = rawCommission.mul(commissionPercentages[i]).div(
+                    COMMISSION_RATE
+                );
                 if (com > commissionLeft) {
                     com = commissionLeft;
                 }
@@ -183,7 +196,7 @@ contract PeakReward {
         @param user The user whose stake will be queried
      */
     function _peakStakeOf(address user) internal view returns (uint256) {
-        // TODO: connect with staking contract
+        return peakStaking.userStakeAmount(user);
     }
 
     /**
