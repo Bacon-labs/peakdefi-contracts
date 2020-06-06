@@ -1,4 +1,4 @@
-pragma solidity 0.5.13;
+pragma solidity 0.5.17;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
@@ -15,6 +15,8 @@ contract PeakStaking {
     uint256 internal constant INTEREST_SLOPE = 2 * (10**8); // Interest rate factor drops to 0 at 5B mintedPeakTokens
     uint256 internal constant BIGGER_BONUS_DIVISOR = 10**15; // biggerBonus = stakeAmount / (10 million peak)
     uint256 internal constant MAX_BIGGER_BONUS = 10**17; // biggerBonus <= 10%
+    uint256 internal constant DAILY_BASE_REWARD = 15 * (10**14); // dailyBaseReward = 0.0015
+    uint256 internal constant DAILY_GROWING_REWARD = 10**12; // dailyGrowingReward = 1e-6
     uint256 internal constant YEAR_IN_DAYS = 365;
     uint256 internal constant DAY_IN_SECONDS = 86400;
     uint256 internal constant COMMISSION_RATE = 20 * (10**16); // 20%
@@ -88,7 +90,7 @@ contract PeakStaking {
         address actualReferrer = peakReward.referrerOf(msg.sender);
         if (actualReferrer != address(0)) {
             // pay referral bonus to referrer
-            uint256 rawCommission = stakeAmount.mul(COMMISSION_RATE).div(
+            uint256 rawCommission = interestAmount.mul(COMMISSION_RATE).div(
                 PRECISION
             );
             peakToken.mint(address(this), rawCommission);
@@ -109,7 +111,7 @@ contract PeakStaking {
             peakToken.mint(msg.sender, referralStakerBonus);
 
             // increment referrer CV
-            peakReward.incrementCareerValueInPeak(actualReferrer, stakeAmount);
+            peakReward.incrementCareerValueInPeak(actualReferrer, interestAmount);
         }
     }
 
@@ -172,57 +174,7 @@ contract PeakStaking {
         pure
         returns (uint256)
     {
-        if (stakeTimeInDays < 10) {
-            return 0;
-        } else if (stakeTimeInDays < 100) {
-            return PRECISION.mul(9).div(100);
-        } else if (stakeTimeInDays < 150) {
-            uint256 minBonus = PRECISION.mul(20).div(100);
-            uint256 maxBonus = PRECISION.mul(30).div(100);
-            uint256 minDay = 100;
-            uint256 maxDay = 150;
-            return
-                minBonus.add(
-                    maxBonus.sub(minBonus).mul(stakeTimeInDays.sub(minDay)).div(
-                        maxDay.sub(minDay)
-                    )
-                );
-        } else if (stakeTimeInDays < 250) {
-            uint256 minBonus = PRECISION.mul(30).div(100);
-            uint256 maxBonus = PRECISION.mul(40).div(100);
-            uint256 minDay = 150;
-            uint256 maxDay = 250;
-            return
-                minBonus.add(
-                    maxBonus.sub(minBonus).mul(stakeTimeInDays.sub(minDay)).div(
-                        maxDay.sub(minDay)
-                    )
-                );
-        } else if (stakeTimeInDays < 500) {
-            uint256 minBonus = PRECISION.mul(40).div(100);
-            uint256 maxBonus = PRECISION.mul(50).div(100);
-            uint256 minDay = 250;
-            uint256 maxDay = 500;
-            return
-                minBonus.add(
-                    maxBonus.sub(minBonus).mul(stakeTimeInDays.sub(minDay)).div(
-                        maxDay.sub(minDay)
-                    )
-                );
-        } else if (stakeTimeInDays < 1000) {
-            uint256 minBonus = PRECISION.mul(50).div(100);
-            uint256 maxBonus = PRECISION.mul(70).div(100);
-            uint256 minDay = 500;
-            uint256 maxDay = 1000;
-            return
-                minBonus.add(
-                    maxBonus.sub(minBonus).mul(stakeTimeInDays.sub(minDay)).div(
-                        maxDay.sub(minDay)
-                    )
-                );
-        } else {
-            return PRECISION.mul(90).div(100);
-        }
+        return DAILY_BASE_REWARD.mul(stakeTimeInDays).add(DAILY_GROWING_REWARD.mul(stakeTimeInDays).mul(stakeTimeInDays.add(1)).div(2));
     }
 
     function _interestRateFactor(uint256 _mintedPeakTokens)

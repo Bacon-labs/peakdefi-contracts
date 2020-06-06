@@ -1,4 +1,4 @@
-pragma solidity 0.5.13;
+pragma solidity 0.5.17;
 
 interface IMiniMeToken {
     function balanceOf(address _owner) external view returns (uint256 balance);
