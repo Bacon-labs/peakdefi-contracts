@@ -17,7 +17,7 @@ contract PeakStaking {
     uint256 internal constant MAX_BIGGER_BONUS = 10**17; // biggerBonus <= 10%
     uint256 internal constant DAILY_BASE_REWARD = 15 * (10**14); // dailyBaseReward = 0.0015
     uint256 internal constant DAILY_GROWING_REWARD = 10**12; // dailyGrowingReward = 1e-6
-    uint256 internal constant YEAR_IN_DAYS = 365;
+    uint256 internal constant MAX_STAKE_PERIOD = 1000; // Max staking time is 1000 days
     uint256 internal constant DAY_IN_SECONDS = 86400;
     uint256 internal constant COMMISSION_RATE = 20 * (10**16); // 20%
     uint256 internal constant REFERRAL_STAKER_BONUS = 3 * (10**16); // 3%
@@ -55,6 +55,8 @@ contract PeakStaking {
         uint256 stakeTimeInDays,
         address referrer
     ) public returns (uint256 stakeIdx) {
+        require(stakeTimeInDays <= MAX_STAKE_PERIOD, "PeakStaking: stakeTimeInDays > MAX_STAKE_PERIOD");
+
         // record stake
         uint256 interestAmount = getInterestAmount(
             stakeAmount,
@@ -164,8 +166,7 @@ contract PeakStaking {
         );
         uint256 interestAmount = stakeAmount
             .mul(interestRate)
-            .mul(stakeTimeInDays)
-            .div(YEAR_IN_DAYS.mul(PRECISION));
+            .div(PRECISION);
         return interestAmount;
     }
 
