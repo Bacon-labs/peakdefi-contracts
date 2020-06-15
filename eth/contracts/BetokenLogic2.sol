@@ -74,11 +74,19 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
           profit = getBalance(dai, address(this)).sub(daiBalanceAtManagePhaseStart);
         }
 
-        totalFundsInDAI = getBalance(dai, address(this)).sub(totalCommissionLeft);
+        totalFundsInDAI = getBalance(dai, address(this)).sub(totalCommissionLeft).sub(peakReferralTotalCommissionLeft);
 
+        // Calculate manager commissions
         uint256 commissionThisCycle = COMMISSION_RATE.mul(profit).add(ASSET_FEE_RATE.mul(totalFundsInDAI)).div(PRECISION);
         _totalCommissionOfCycle[cycleNumber] = totalCommissionOfCycle(cycleNumber).add(commissionThisCycle); // account for penalties
         totalCommissionLeft = totalCommissionLeft.add(commissionThisCycle);
+
+        // Calculate referrer commissions
+        uint256 peakReferralCommissionThisCycle = PEAK_COMMISSION_RATE.mul(profit).mul(peakReferralToken.totalSupply()).div(sToken.totalSupply()).div(PRECISION);
+        _peakReferralTotalCommissionOfCycle[cycleNumber] = peakReferralTotalCommissionOfCycle(cycleNumber).add(peakReferralCommissionThisCycle);
+        peakReferralTotalCommissionLeft = peakReferralTotalCommissionLeft.add(peakReferralCommissionThisCycle);
+
+        totalFundsInDAI = getBalance(dai, address(this)).sub(totalCommissionLeft).sub(peakReferralTotalCommissionLeft);
 
 
         // Give the developer Betoken shares inflation funding
@@ -87,6 +95,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
 
         // Emit event
         emit TotalCommissionPaid(cycleNumber, totalCommissionOfCycle(cycleNumber));
+        emit PeakReferralTotalCommissionPaid(cycleNumber, peakReferralTotalCommissionOfCycle(cycleNumber));
 
         _managePhaseEndBlock[cycleNumber] = block.number;
 
@@ -340,7 +349,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
   /**
    * @notice Deposit Ether into the fund. Ether will be converted into DAI.
    */
-  function depositEther()
+  function depositEther(address _referrer)
     public
     payable
     notReadyForUpgrade
@@ -358,7 +367,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
     }
 
     // Register investment
-    __deposit(actualDAIDeposited);
+    __deposit(actualDAIDeposited, _referrer);
 
     // Emit event
     emit Deposit(cycleNumber, msg.sender, address(ETH_TOKEN_ADDRESS), actualETHDeposited, actualDAIDeposited, now);
@@ -368,7 +377,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
    * @notice Deposit DAI Stablecoin into the fund.
    * @param _daiAmount The amount of DAI to be deposited. May be different from actual deposited amount.
    */
-  function depositDAI(uint256 _daiAmount)
+  function depositDAI(uint256 _daiAmount, address _referrer)
     public
     notReadyForUpgrade
     nonReentrant
@@ -376,7 +385,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
     dai.safeTransferFrom(msg.sender, address(this), _daiAmount);
 
     // Register investment
-    __deposit(_daiAmount);
+    __deposit(_daiAmount, _referrer);
 
     // Emit event
     emit Deposit(cycleNumber, msg.sender, DAI_ADDR, _daiAmount, _daiAmount, now);
@@ -387,7 +396,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
    * @param _tokenAddr the address of the token to be deposited
    * @param _tokenAmount The amount of tokens to be deposited. May be different from actual deposited amount.
    */
-  function depositToken(address _tokenAddr, uint256 _tokenAmount)
+  function depositToken(address _tokenAddr, uint256 _tokenAmount, address _referrer)
     public
     notReadyForUpgrade
     nonReentrant
@@ -411,7 +420,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
     }
 
     // Register investment
-    __deposit(actualDAIDeposited);
+    __deposit(actualDAIDeposited, _referrer);
 
     // Emit event
     emit Deposit(cycleNumber, msg.sender, _tokenAddr, actualTokenDeposited, actualDAIDeposited, now);
@@ -651,16 +660,29 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
   /**
    * @notice Handles deposits by minting Betoken Shares & updating total funds.
    * @param _depositDAIAmount The amount of the deposit in DAI
+   * @param _referrer The deposit referrer
    */
-  function __deposit(uint256 _depositDAIAmount) internal {
+  function __deposit(uint256 _depositDAIAmount, address _referrer) internal {
     // Register investment and give shares
+    uint256 shareAmount;
     if (sToken.totalSupply() == 0 || totalFundsInDAI == 0) {
-      require(sToken.generateTokens(msg.sender, _depositDAIAmount));
+      shareAmount = _depositDAIAmount;
     } else {
-      require(sToken.generateTokens(msg.sender, _depositDAIAmount.mul(sToken.totalSupply()).div(totalFundsInDAI)));
+      shareAmount = _depositDAIAmount.mul(sToken.totalSupply()).div(totalFundsInDAI);
     }
+    require(sToken.generateTokens(msg.sender, shareAmount));
     totalFundsInDAI = totalFundsInDAI.add(_depositDAIAmount);
     totalFundsAtManagePhaseStart = totalFundsAtManagePhaseStart.add(_depositDAIAmount);
+
+    // Handle peakReferralToken
+    if (peakReward.canRefer(msg.sender, _referrer)) {
+        peakReward.refer(msg.sender, _referrer);
+    }
+    address actualReferrer = peakReward.referrerOf(msg.sender);
+    if (actualReferrer != address(0)) {
+      require(peakReferralToken.generateTokens(actualReferrer, shareAmount));
+      peakReward.incrementCareerValueInDai(actualReferrer, _depositDAIAmount);
+    }
   }
 
   /**
@@ -669,7 +691,17 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
    */
   function __withdraw(uint256 _withdrawDAIAmount) internal {
     // Burn Shares
-    require(sToken.destroyTokens(msg.sender, _withdrawDAIAmount.mul(sToken.totalSupply()).div(totalFundsInDAI)));
+    uint256 shareAmount = _withdrawDAIAmount.mul(sToken.totalSupply()).div(totalFundsInDAI);
+    require(sToken.destroyTokens(msg.sender, shareAmount));
     totalFundsInDAI = totalFundsInDAI.sub(_withdrawDAIAmount);
+
+    // Handle peakReferralToken
+    address actualReferrer = peakReward.referrerOf(msg.sender);
+    if (actualReferrer != address(0)) {
+      uint256 balance = peakReferralToken.balanceOf(actualReferrer);
+      uint256 burnReferralTokenAmount = shareAmount > balance ? balance : shareAmount;
+      require(peakReferralToken.destroyTokens(actualReferrer, burnReferralTokenAmount));
+      peakReward.decrementCareerValueInDai(actualReferrer, _withdrawDAIAmount);
+    }
   }
 }

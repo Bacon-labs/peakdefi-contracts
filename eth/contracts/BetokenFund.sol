@@ -35,7 +35,9 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
     address _betokenLogic,
     address _betokenLogic2,
     uint256 _startCycleNumber,
-    address payable _dexagAddr
+    address payable _dexagAddr,
+    address _peakRewardAddr,
+    address payable _peakReferralTokenAddr
   )
     public
     Utils(_daiAddr, _kyberAddr, _dexagAddr)
@@ -54,6 +56,8 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
 
     cToken = IMiniMeToken(_kroAddr);
     sToken = IMiniMeToken(_sTokenAddr);
+    peakReward = PeakReward(_peakRewardAddr);
+    peakReferralToken = IMiniMeToken(_peakReferralTokenAddr);
   }
 
   function initTokenListings(
@@ -324,11 +328,11 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
   /**
    * @notice Deposit Ether into the fund. Ether will be converted into DAI.
    */
-  function depositEther()
+  function depositEther(address _referrer)
     public
     payable
   {
-    (bool success,) = betokenLogic2.delegatecall(abi.encodeWithSelector(this.depositEther.selector));
+    (bool success,) = betokenLogic2.delegatecall(abi.encodeWithSelector(this.depositEther.selector, _referrer));
     if (!success) { revert(); }
   }
 
@@ -336,10 +340,10 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
    * @notice Deposit DAI Stablecoin into the fund.
    * @param _daiAmount The amount of DAI to be deposited. May be different from actual deposited amount.
    */
-  function depositDAI(uint256 _daiAmount)
+  function depositDAI(uint256 _daiAmount, address _referrer)
     public
   {
-    (bool success,) = betokenLogic2.delegatecall(abi.encodeWithSelector(this.depositDAI.selector, _daiAmount));
+    (bool success,) = betokenLogic2.delegatecall(abi.encodeWithSelector(this.depositDAI.selector, _daiAmount, _referrer));
     if (!success) { revert(); }
   }
 
@@ -348,10 +352,10 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
    * @param _tokenAddr the address of the token to be deposited
    * @param _tokenAmount The amount of tokens to be deposited. May be different from actual deposited amount.
    */
-  function depositToken(address _tokenAddr, uint256 _tokenAmount)
+  function depositToken(address _tokenAddr, uint256 _tokenAmount, address _referrer)
     public
   {
-    (bool success,) = betokenLogic2.delegatecall(abi.encodeWithSelector(this.depositToken.selector, _tokenAddr, _tokenAmount));
+    (bool success,) = betokenLogic2.delegatecall(abi.encodeWithSelector(this.depositToken.selector, _tokenAddr, _tokenAmount, _referrer));
     if (!success) { revert(); }
   }
 
@@ -625,4 +629,50 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
   }
 
   function() external payable {}
+
+  /**
+    PeakDeFi
+   */
+
+  /**
+   * @notice Returns the commission balance of `_referrer`
+   * @return the commission balance and the received penalty, denoted in DAI
+   */
+  function peakReferralCommissionBalanceOf(address _referrer) public returns (uint256 _commission) {
+    (bool success, bytes memory result) = betokenLogic.delegatecall(abi.encodeWithSelector(this.peakReferralCommissionBalanceOf.selector, _referrer));
+    if (!success) { return 0; }
+    return abi.decode(result, (uint256));
+  }
+
+  /**
+   * @notice Returns the commission amount received by `_referrer` in the `_cycle`th cycle
+   * @return the commission amount and the received penalty, denoted in DAI
+   */
+  function peakReferralCommissionOfAt(address _referrer, uint256 _cycle) public returns (uint256 _commission) {
+    (bool success, bytes memory result) = betokenLogic.delegatecall(abi.encodeWithSelector(this.peakReferralCommissionOfAt.selector, _referrer, _cycle));
+    if (!success) { return 0; }
+    return abi.decode(result, (uint256));
+  }
+
+  /**
+   * @notice Redeems commission.
+   */
+  function peakReferralRedeemCommission()
+    public
+  {
+    (bool success,) = betokenLogic.delegatecall(abi.encodeWithSelector(this.peakReferralRedeemCommission.selector));
+    if (!success) { revert(); }
+  }
+
+  /**
+   * @notice Redeems commission for a particular cycle.
+   * @param _cycle the cycle for which the commission will be redeemed.
+   *        Commissions for a cycle will be redeemed during the Intermission phase of the next cycle, so _cycle must < cycleNumber.
+   */
+  function peakReferralRedeemCommissionForCycle(uint256 _cycle)
+    public
+  {
+    (bool success,) = betokenLogic.delegatecall(abi.encodeWithSelector(this.peakReferralRedeemCommissionForCycle.selector, _cycle));
+    if (!success) { revert(); }
+  }
 }

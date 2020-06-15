@@ -7,6 +7,7 @@ import "./interfaces/IMiniMeToken.sol";
 import "./tokens/minime/TokenController.sol";
 import "./Utils.sol";
 import "./BetokenProxyInterface.sol";
+import "./peak/reward/PeakReward.sol";
 
 /**
  * @title The storage layout of BetokenFund
@@ -32,7 +33,8 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
   }
 
   // Fund parameters
-  uint256 public constant COMMISSION_RATE = 20 * (10 ** 16); // The proportion of profits that gets distributed to Kairo holders every cycle.
+  uint256 public constant COMMISSION_RATE = 15 * (10 ** 16); // The proportion of profits that gets distributed to Kairo holders every cycle.
+  uint256 public constant PEAK_COMMISSION_RATE = 20 * (10 ** 16); // The proportion of profits that gets distributed to PeakDeFi referrers every cycle.
   uint256 public constant ASSET_FEE_RATE = 1 * (10 ** 15); // The proportion of fund balance that gets distributed to Kairo holders every cycle.
   uint256 public constant NEXT_PHASE_REWARD = 1 * (10 ** 18); // Amount of Kairo rewarded to the user who calls nextPhase().
   uint256 public constant MAX_BUY_KRO_PROP = 1 * (10 ** 16); // max Kairo you can buy is 1% of total supply
@@ -163,6 +165,14 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
   IMiniMeToken internal sToken;
   BetokenProxyInterface internal proxy;
 
+  // PeakDeFi
+  uint256 public peakReferralTotalCommissionLeft;
+  mapping(uint256 => uint256) internal _peakReferralTotalCommissionOfCycle;
+  mapping(address => uint256) internal _peakReferralLastCommissionRedemption;
+  mapping(address => mapping(uint256 => bool)) internal _peakReferralHasRedeemedCommissionForCycle;
+  IMiniMeToken public peakReferralToken;
+  PeakReward public peakReward;
+
   // Events
 
   event ChangedPhase(uint256 indexed _cycleNumber, uint256 indexed _newPhase, uint256 _timestamp, uint256 _totalFundsInDAI);
@@ -188,6 +198,9 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
   event ProposedCandidate(uint256 indexed _cycleNumber, uint256 indexed _voteID, address indexed _sender, address _candidate);
   event Voted(uint256 indexed _cycleNumber, uint256 indexed _voteID, address indexed _sender, bool _inSupport, uint256 _weight);
   event FinalizedNextVersion(uint256 indexed _cycleNumber, address _nextVersion);
+
+  event PeakReferralCommissionPaid(uint256 indexed _cycleNumber, address indexed _sender, uint256 _commission);
+  event PeakReferralTotalCommissionPaid(uint256 indexed _cycleNumber, uint256 _totalCommissionInDAI);
 
   /*
   Helper functions shared by both BetokenLogic & BetokenFund
@@ -304,5 +317,29 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
       return previousVersion == address(0) ? 0 : BetokenStorage(previousVersion).lastActiveCycle(_manager);
     }
     return _lastActiveCycle[_manager];
+  }
+
+  /**
+    PeakDeFi
+   */
+  function peakReferralLastCommissionRedemption(address _manager) public view returns (uint256) {
+    if (_peakReferralLastCommissionRedemption[_manager] == 0) {
+      return previousVersion == address(0) ? 0 : BetokenStorage(previousVersion).peakReferralLastCommissionRedemption(_manager);
+    }
+    return _peakReferralLastCommissionRedemption[_manager];
+  }
+
+  function peakReferralHasRedeemedCommissionForCycle(address _manager, uint256 _cycle) public view returns (bool) {
+    if (_peakReferralHasRedeemedCommissionForCycle[_manager][_cycle] == false) {
+      return previousVersion == address(0) ? false : BetokenStorage(previousVersion).peakReferralHasRedeemedCommissionForCycle(_manager, _cycle);
+    }
+    return _peakReferralHasRedeemedCommissionForCycle[_manager][_cycle];
+  }
+
+  function peakReferralTotalCommissionOfCycle(uint256 _cycle) public view returns (uint256) {
+    if (_peakReferralTotalCommissionOfCycle[_cycle] == 0) {
+      return previousVersion == address(0) ? 0 : BetokenStorage(previousVersion).peakReferralTotalCommissionOfCycle(_cycle);
+    }
+    return _peakReferralTotalCommissionOfCycle[_cycle];
   }
 }

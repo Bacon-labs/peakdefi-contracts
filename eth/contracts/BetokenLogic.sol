@@ -633,4 +633,114 @@ contract BetokenLogic is BetokenStorage, Utils(address(0), address(0), address(0
     }
     totalFundsInDAI = totalFundsInDAI.add(_depositDAIAmount);
   }
+
+  /**
+    PeakDeFi
+   */
+
+  /**
+   * @notice Returns the commission balance of `_referrer`
+   * @return the commission balance, denoted in DAI
+   */
+  function peakReferralCommissionBalanceOf(address _referrer) public view returns (uint256 _commission) {
+    if (peakReferralLastCommissionRedemption(_referrer) >= cycleNumber) { return (0); }
+    uint256 cycle = peakReferralLastCommissionRedemption(_referrer) > 0 ? peakReferralLastCommissionRedemption(_referrer) : 1;
+    uint256 cycleCommission;
+    for (; cycle < cycleNumber; cycle = cycle.add(1)) {
+      (cycleCommission) = peakReferralCommissionOfAt(_referrer, cycle);
+      _commission = _commission.add(cycleCommission);
+    }
+  }
+
+  /**
+   * @notice Returns the commission amount received by `_referrer` in the `_cycle`th cycle
+   * @return the commission amount, denoted in DAI
+   */
+  function peakReferralCommissionOfAt(address _referrer, uint256 _cycle) public view returns (uint256 _commission) {
+    _commission = peakReferralTotalCommissionOfCycle(_cycle).mul(peakReferralToken.balanceOfAt(_referrer, managePhaseEndBlock(_cycle)))
+      .div(peakReferralToken.totalSupplyAt(managePhaseEndBlock(_cycle)));
+  }
+
+  /**
+   * @notice Redeems commission.
+   */
+  function peakReferralRedeemCommission()
+    public
+    during(CyclePhase.Intermission)
+    nonReentrant
+  {
+    uint256 commission = __peakReferralRedeemCommission();
+
+    // Transfer the commission in DAI
+    dai.safeApprove(address(peakReward), commission);
+    peakReward.payCommission(
+      msg.sender,
+      address(dai),
+      commission,
+      false
+    );
+  }
+
+  /**
+   * @notice Redeems commission for a particular cycle.
+   * @param _cycle the cycle for which the commission will be redeemed.
+   *        Commissions for a cycle will be redeemed during the Intermission phase of the next cycle, so _cycle must < cycleNumber.
+   */
+  function peakReferralRedeemCommissionForCycle(uint256 _cycle)
+    public
+    during(CyclePhase.Intermission)
+    nonReentrant
+  {
+    require(_cycle < cycleNumber);
+
+    uint256 commission = __peakReferralRedeemCommissionForCycle(_cycle);
+    
+    // Transfer the commission in DAI
+    dai.safeApprove(address(peakReward), commission);
+    peakReward.payCommission(
+      msg.sender,
+      address(dai),
+      commission,
+      false
+    );
+  }
+
+  /**
+   * @notice Redeems the commission for all previous cycles. Updates the related variables.
+   * @return the amount of commission to be redeemed
+   */
+  function __peakReferralRedeemCommission() internal returns (uint256 _commission) {
+    require(peakReferralLastCommissionRedemption(msg.sender) < cycleNumber);
+
+    _commission = peakReferralCommissionBalanceOf(msg.sender);
+
+    // record the redemption to prevent double-redemption
+    for (uint256 i = peakReferralLastCommissionRedemption(msg.sender); i < cycleNumber; i = i.add(1)) {
+      _peakReferralHasRedeemedCommissionForCycle[msg.sender][i] = true;
+    }
+    _peakReferralLastCommissionRedemption[msg.sender] = cycleNumber;
+
+    // record the decrease in commission pool
+    peakReferralTotalCommissionLeft = peakReferralTotalCommissionLeft.sub(_commission);
+
+    emit PeakReferralCommissionPaid(cycleNumber, msg.sender, _commission);
+  }
+
+  /**
+   * @notice Redeems commission for a particular cycle. Updates the related variables.
+   * @param _cycle the cycle for which the commission will be redeemed
+   * @return the amount of commission to be redeemed
+   */
+  function __peakReferralRedeemCommissionForCycle(uint256 _cycle) internal returns (uint256 _commission) {
+    require(!peakReferralHasRedeemedCommissionForCycle(msg.sender, _cycle));
+
+    _commission = peakReferralCommissionOfAt(msg.sender, _cycle);
+
+    _peakReferralHasRedeemedCommissionForCycle[msg.sender][_cycle] = true;
+
+    // record the decrease in commission pool
+    peakReferralTotalCommissionLeft = peakReferralTotalCommissionLeft.sub(_commission);
+
+    emit PeakReferralCommissionPaid(_cycle, msg.sender, _commission);
+  }
 }

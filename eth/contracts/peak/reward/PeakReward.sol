@@ -147,6 +147,23 @@ contract PeakReward is SignerRole {
     }
 
     /**
+        @notice Decrements a user's career value
+        @param user The user
+        @param decCV The CV decrease amount, in Dai
+     */
+    function decrementCareerValueInDai(address user, uint256 decCV)
+        public
+        regUser(user)
+        onlySigner
+    {
+        if (careerValue[user] >= decCV) {
+            careerValue[user] = careerValue[user].sub(decCV);
+        } else {
+            careerValue[user] = 0;
+        }
+    }
+
+    /**
         @notice Increments a user's career value
         @param user The user
         @param incCVInPeak The CV increase amount, in PEAK tokens
