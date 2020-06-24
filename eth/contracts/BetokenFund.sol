@@ -36,6 +36,7 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
     address _betokenLogic2,
     uint256 _startCycleNumber,
     address payable _dexagAddr,
+    address _betokenLogic3,
     address _peakRewardAddr,
     address payable _peakReferralTokenAddr
   )
@@ -51,6 +52,7 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
     compoundFactoryAddr = _compoundFactoryAddr;
     betokenLogic = _betokenLogic;
     betokenLogic2 = _betokenLogic2;
+    betokenLogic3 = _betokenLogic3;
     previousVersion = _previousVersion;
     cycleNumber = _startCycleNumber;
 
@@ -62,8 +64,7 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
 
   function initTokenListings(
     address[] memory _kyberTokens,
-    address[] memory _compoundTokens,
-    address[] memory _positionTokens
+    address[] memory _compoundTokens
   )
     public
     onlyOwner
@@ -79,10 +80,6 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
 
     for (i = 0; i < _compoundTokens.length; i = i.add(1)) {
       isCompoundToken[_compoundTokens[i]] = true;
-    }
-
-    for (i = 0; i < _positionTokens.length; i = i.add(1)) {
-      isPositionToken[_positionTokens[i]] = true;
     }
   }
 
@@ -108,7 +105,7 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
    * @return True if successfully changed candidate, false otherwise.
    */
   function developerInitiateUpgrade(address payable _candidate) public returns (bool _success) {
-    (bool success, bytes memory result) = betokenLogic2.delegatecall(abi.encodeWithSelector(this.developerInitiateUpgrade.selector, _candidate));
+    (bool success, bytes memory result) = betokenLogic3.delegatecall(abi.encodeWithSelector(this.developerInitiateUpgrade.selector, _candidate));
     if (!success) { return false; }
     return abi.decode(result, (bool));
   }
@@ -121,7 +118,7 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
    * @return True if successfully changed signal, false if no changes were made.
    */
   function signalUpgrade(bool _inSupport) public returns (bool _success) {
-    (bool success, bytes memory result) = betokenLogic2.delegatecall(abi.encodeWithSelector(this.signalUpgrade.selector, _inSupport));
+    (bool success, bytes memory result) = betokenLogic3.delegatecall(abi.encodeWithSelector(this.signalUpgrade.selector, _inSupport));
     if (!success) { return false; }
     return abi.decode(result, (bool));
   }
@@ -135,7 +132,7 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
    * @return True if successfully proposed/changed candidate, false otherwise.
    */
   function proposeCandidate(uint256 _chunkNumber, address payable _candidate) public returns (bool _success) {
-    (bool success, bytes memory result) = betokenLogic2.delegatecall(abi.encodeWithSelector(this.proposeCandidate.selector, _chunkNumber, _candidate));
+    (bool success, bytes memory result) = betokenLogic3.delegatecall(abi.encodeWithSelector(this.proposeCandidate.selector, _chunkNumber, _candidate));
     if (!success) { return false; }
     return abi.decode(result, (bool));
   }
@@ -147,7 +144,7 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
    * @return True if successfully changed vote, false otherwise.
    */
   function voteOnCandidate(uint256 _chunkNumber, bool _inSupport) public returns (bool _success) {
-    (bool success, bytes memory result) = betokenLogic2.delegatecall(abi.encodeWithSelector(this.voteOnCandidate.selector, _chunkNumber, _inSupport));
+    (bool success, bytes memory result) = betokenLogic3.delegatecall(abi.encodeWithSelector(this.voteOnCandidate.selector, _chunkNumber, _inSupport));
     if (!success) { return false; }
     return abi.decode(result, (bool));
   }
@@ -158,7 +155,7 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
    * @return True if successful, false otherwise
    */
   function finalizeSuccessfulVote(uint256 _chunkNumber) public returns (bool _success) {
-    (bool success, bytes memory result) = betokenLogic2.delegatecall(abi.encodeWithSelector(this.finalizeSuccessfulVote.selector, _chunkNumber));
+    (bool success, bytes memory result) = betokenLogic3.delegatecall(abi.encodeWithSelector(this.finalizeSuccessfulVote.selector, _chunkNumber));
     if (!success) { return false; }
     return abi.decode(result, (bool));
   }
@@ -281,7 +278,7 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
   function nextPhase()
     public
   {
-    (bool success,) = betokenLogic2.delegatecall(abi.encodeWithSelector(this.nextPhase.selector));
+    (bool success,) = betokenLogic3.delegatecall(abi.encodeWithSelector(this.nextPhase.selector));
     if (!success) { revert(); }
   }
 
@@ -639,7 +636,7 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
    * @return the commission balance and the received penalty, denoted in DAI
    */
   function peakReferralCommissionBalanceOf(address _referrer) public returns (uint256 _commission) {
-    (bool success, bytes memory result) = betokenLogic.delegatecall(abi.encodeWithSelector(this.peakReferralCommissionBalanceOf.selector, _referrer));
+    (bool success, bytes memory result) = betokenLogic3.delegatecall(abi.encodeWithSelector(this.peakReferralCommissionBalanceOf.selector, _referrer));
     if (!success) { return 0; }
     return abi.decode(result, (uint256));
   }
@@ -649,7 +646,7 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
    * @return the commission amount and the received penalty, denoted in DAI
    */
   function peakReferralCommissionOfAt(address _referrer, uint256 _cycle) public returns (uint256 _commission) {
-    (bool success, bytes memory result) = betokenLogic.delegatecall(abi.encodeWithSelector(this.peakReferralCommissionOfAt.selector, _referrer, _cycle));
+    (bool success, bytes memory result) = betokenLogic3.delegatecall(abi.encodeWithSelector(this.peakReferralCommissionOfAt.selector, _referrer, _cycle));
     if (!success) { return 0; }
     return abi.decode(result, (uint256));
   }
@@ -660,7 +657,7 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
   function peakReferralRedeemCommission()
     public
   {
-    (bool success,) = betokenLogic.delegatecall(abi.encodeWithSelector(this.peakReferralRedeemCommission.selector));
+    (bool success,) = betokenLogic3.delegatecall(abi.encodeWithSelector(this.peakReferralRedeemCommission.selector));
     if (!success) { revert(); }
   }
 
@@ -672,7 +669,7 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
   function peakReferralRedeemCommissionForCycle(uint256 _cycle)
     public
   {
-    (bool success,) = betokenLogic.delegatecall(abi.encodeWithSelector(this.peakReferralRedeemCommissionForCycle.selector, _cycle));
+    (bool success,) = betokenLogic3.delegatecall(abi.encodeWithSelector(this.peakReferralRedeemCommissionForCycle.selector, _cycle));
     if (!success) { revert(); }
   }
 }

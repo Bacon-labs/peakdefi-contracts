@@ -1,7 +1,6 @@
 pragma solidity 0.5.17;
 
 import "./BetokenStorage.sol";
-import "./interfaces/PositionToken.sol";
 import "./derivatives/CompoundOrderFactory.sol";
 
 /**
@@ -122,7 +121,7 @@ contract BetokenLogic is BetokenStorage, Utils(address(0), address(0), address(0
   {
     require(_minPrice <= _maxPrice);
     require(_stake > 0);
-    require(isKyberToken[_tokenAddress] || isPositionToken[_tokenAddress]);
+    require(isKyberToken[_tokenAddress]);
 
     // Collect stake
     require(cToken.generateTokens(address(this), _stake));
@@ -476,59 +475,29 @@ contract BetokenLogic is BetokenStorage, Utils(address(0), address(0), address(0
   {
     Investment storage investment = userInvestments[msg.sender][_investmentId];
     address token = investment.tokenAddress;
-    if (isPositionToken[token]) {
-      // Fulcrum trading
-      PositionToken pToken = PositionToken(token);
-      uint256 beforeBalance;
-      if (_buy) {
-        _actualSrcAmount = totalFundsInDAI.mul(investment.stake).div(cToken.totalSupply());
-        dai.safeApprove(token, 0);
-        dai.safeApprove(token, _actualSrcAmount);
-        beforeBalance = pToken.balanceOf(address(this));
-        pToken.mintWithToken(address(this), DAI_ADDR, _actualSrcAmount, 0);
-        _actualDestAmount = pToken.balanceOf(address(this)).sub(beforeBalance);
-        require(_actualDestAmount > 0);
-        dai.safeApprove(token, 0);
-
-        investment.buyPrice = calcRateFromQty(_actualDestAmount, _actualSrcAmount, pToken.decimals(), dai.decimals()); // price of pToken in DAI
-        require(_minPrice <= investment.buyPrice && investment.buyPrice <= _maxPrice);
-
-        investment.tokenAmount = _actualDestAmount;
-        investment.buyCostInDAI = _actualSrcAmount;
+    // Basic trading
+    uint256 dInS; // price of dest token denominated in src token
+    uint256 sInD; // price of src token denominated in dest token
+    if (_buy) {
+      if (_useKyber) {
+        (dInS, sInD, _actualDestAmount, _actualSrcAmount) = __kyberTrade(dai, totalFundsInDAI.mul(investment.stake).div(cToken.totalSupply()), ERC20Detailed(token));
       } else {
-        _actualSrcAmount = investment.tokenAmount;
-        beforeBalance = dai.balanceOf(address(this));
-        pToken.burnToToken(address(this), DAI_ADDR, _actualSrcAmount, 0);
-        _actualDestAmount = dai.balanceOf(address(this)).sub(beforeBalance);
-
-        investment.sellPrice = calcRateFromQty(_actualSrcAmount, _actualDestAmount, pToken.decimals(), dai.decimals()); // price of pToken in DAI
-        require(_minPrice <= investment.sellPrice && investment.sellPrice <= _maxPrice);
+        // dex.ag trading
+        (dInS, sInD, _actualDestAmount, _actualSrcAmount) = __dexagTrade(dai, totalFundsInDAI.mul(investment.stake).div(cToken.totalSupply()), ERC20Detailed(token), _calldata);
       }
+      require(_minPrice <= dInS && dInS <= _maxPrice);
+      investment.buyPrice = dInS;
+      investment.tokenAmount = _actualDestAmount;
+      investment.buyCostInDAI = _actualSrcAmount;
     } else {
-      // Basic trading
-      uint256 dInS; // price of dest token denominated in src token
-      uint256 sInD; // price of src token denominated in dest token
-      if (_buy) {
-        if (_useKyber) {
-          (dInS, sInD, _actualDestAmount, _actualSrcAmount) = __kyberTrade(dai, totalFundsInDAI.mul(investment.stake).div(cToken.totalSupply()), ERC20Detailed(token));
-        } else {
-          // dex.ag trading
-          (dInS, sInD, _actualDestAmount, _actualSrcAmount) = __dexagTrade(dai, totalFundsInDAI.mul(investment.stake).div(cToken.totalSupply()), ERC20Detailed(token), _calldata);
-        }
-        require(_minPrice <= dInS && dInS <= _maxPrice);
-        investment.buyPrice = dInS;
-        investment.tokenAmount = _actualDestAmount;
-        investment.buyCostInDAI = _actualSrcAmount;
+      if (_useKyber) {
+        (dInS, sInD, _actualDestAmount, _actualSrcAmount) = __kyberTrade(ERC20Detailed(token), investment.tokenAmount, dai);
       } else {
-        if (_useKyber) {
-          (dInS, sInD, _actualDestAmount, _actualSrcAmount) = __kyberTrade(ERC20Detailed(token), investment.tokenAmount, dai);
-        } else {
-          (dInS, sInD, _actualDestAmount, _actualSrcAmount) = __dexagTrade(ERC20Detailed(token), investment.tokenAmount, dai, _calldata);
-        }
-        
-        require(_minPrice <= sInD && sInD <= _maxPrice);
-        investment.sellPrice = sInD;
+        (dInS, sInD, _actualDestAmount, _actualSrcAmount) = __dexagTrade(ERC20Detailed(token), investment.tokenAmount, dai, _calldata);
       }
+      
+      require(_minPrice <= sInD && sInD <= _maxPrice);
+      investment.sellPrice = sInD;
     }
   }
 
@@ -632,115 +601,5 @@ contract BetokenLogic is BetokenStorage, Utils(address(0), address(0), address(0
       require(sToken.generateTokens(msg.sender, _depositDAIAmount.mul(sToken.totalSupply()).div(totalFundsInDAI)));
     }
     totalFundsInDAI = totalFundsInDAI.add(_depositDAIAmount);
-  }
-
-  /**
-    PeakDeFi
-   */
-
-  /**
-   * @notice Returns the commission balance of `_referrer`
-   * @return the commission balance, denoted in DAI
-   */
-  function peakReferralCommissionBalanceOf(address _referrer) public view returns (uint256 _commission) {
-    if (peakReferralLastCommissionRedemption(_referrer) >= cycleNumber) { return (0); }
-    uint256 cycle = peakReferralLastCommissionRedemption(_referrer) > 0 ? peakReferralLastCommissionRedemption(_referrer) : 1;
-    uint256 cycleCommission;
-    for (; cycle < cycleNumber; cycle = cycle.add(1)) {
-      (cycleCommission) = peakReferralCommissionOfAt(_referrer, cycle);
-      _commission = _commission.add(cycleCommission);
-    }
-  }
-
-  /**
-   * @notice Returns the commission amount received by `_referrer` in the `_cycle`th cycle
-   * @return the commission amount, denoted in DAI
-   */
-  function peakReferralCommissionOfAt(address _referrer, uint256 _cycle) public view returns (uint256 _commission) {
-    _commission = peakReferralTotalCommissionOfCycle(_cycle).mul(peakReferralToken.balanceOfAt(_referrer, managePhaseEndBlock(_cycle)))
-      .div(peakReferralToken.totalSupplyAt(managePhaseEndBlock(_cycle)));
-  }
-
-  /**
-   * @notice Redeems commission.
-   */
-  function peakReferralRedeemCommission()
-    public
-    during(CyclePhase.Intermission)
-    nonReentrant
-  {
-    uint256 commission = __peakReferralRedeemCommission();
-
-    // Transfer the commission in DAI
-    dai.safeApprove(address(peakReward), commission);
-    peakReward.payCommission(
-      msg.sender,
-      address(dai),
-      commission,
-      false
-    );
-  }
-
-  /**
-   * @notice Redeems commission for a particular cycle.
-   * @param _cycle the cycle for which the commission will be redeemed.
-   *        Commissions for a cycle will be redeemed during the Intermission phase of the next cycle, so _cycle must < cycleNumber.
-   */
-  function peakReferralRedeemCommissionForCycle(uint256 _cycle)
-    public
-    during(CyclePhase.Intermission)
-    nonReentrant
-  {
-    require(_cycle < cycleNumber);
-
-    uint256 commission = __peakReferralRedeemCommissionForCycle(_cycle);
-    
-    // Transfer the commission in DAI
-    dai.safeApprove(address(peakReward), commission);
-    peakReward.payCommission(
-      msg.sender,
-      address(dai),
-      commission,
-      false
-    );
-  }
-
-  /**
-   * @notice Redeems the commission for all previous cycles. Updates the related variables.
-   * @return the amount of commission to be redeemed
-   */
-  function __peakReferralRedeemCommission() internal returns (uint256 _commission) {
-    require(peakReferralLastCommissionRedemption(msg.sender) < cycleNumber);
-
-    _commission = peakReferralCommissionBalanceOf(msg.sender);
-
-    // record the redemption to prevent double-redemption
-    for (uint256 i = peakReferralLastCommissionRedemption(msg.sender); i < cycleNumber; i = i.add(1)) {
-      _peakReferralHasRedeemedCommissionForCycle[msg.sender][i] = true;
-    }
-    _peakReferralLastCommissionRedemption[msg.sender] = cycleNumber;
-
-    // record the decrease in commission pool
-    peakReferralTotalCommissionLeft = peakReferralTotalCommissionLeft.sub(_commission);
-
-    emit PeakReferralCommissionPaid(cycleNumber, msg.sender, _commission);
-  }
-
-  /**
-   * @notice Redeems commission for a particular cycle. Updates the related variables.
-   * @param _cycle the cycle for which the commission will be redeemed
-   * @return the amount of commission to be redeemed
-   */
-  function __peakReferralRedeemCommissionForCycle(uint256 _cycle) internal returns (uint256 _commission) {
-    require(!peakReferralHasRedeemedCommissionForCycle(msg.sender, _cycle));
-
-    _commission = peakReferralCommissionOfAt(msg.sender, _cycle);
-
-    _peakReferralHasRedeemedCommissionForCycle[msg.sender][_cycle] = true;
-
-    // record the decrease in commission pool
-    peakReferralTotalCommissionLeft = peakReferralTotalCommissionLeft.sub(_commission);
-
-    emit PeakReferralCommissionPaid(_cycle, msg.sender, _commission);
   }
 }

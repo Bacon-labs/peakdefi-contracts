@@ -125,7 +125,7 @@ contract("simulation", (accounts) ->
     prevDAIBlnce = BigNumber await dai.balanceOf.call(account2)
     prevShareBlnce = BigNumber await st.balanceOf.call(account2)
     await dai.approve(this.fund.address, bnToString(amount), {from: account2})
-    await this.fund.depositDAI(bnToString(amount), {from: account2})
+    await this.fund.depositDAI(bnToString(amount), ZERO_ADDR, {from: account2})
     await dai.approve(this.fund.address, 0, {from: account2})
 
     # check fund balance
@@ -154,7 +154,7 @@ contract("simulation", (accounts) ->
     prevTokenBlnce = BigNumber await token.balanceOf.call(account)
     prevShareBlnce = BigNumber await st.balanceOf.call(account)
     await token.approve(this.fund.address, bnToString(amount), {from: account})
-    await this.fund.depositToken(token.address, bnToString(amount), {from: account})
+    await this.fund.depositToken(token.address, bnToString(amount), ZERO_ADDR, {from: account})
     await token.approve(this.fund.address, 0, {from: account})
 
     # check shares
@@ -182,7 +182,7 @@ contract("simulation", (accounts) ->
     fundBalance = BigNumber await this.fund.totalFundsInDAI.call()
     prevETHBlnce = BigNumber await web3.eth.getBalance(account3)
     prevShareBlnce = BigNumber await st.balanceOf.call(account3)
-    await this.fund.depositEther({from: account3, value: bnToString(eth_amount), gasPrice: 0})
+    await this.fund.depositEther(ZERO_ADDR, {from: account3, value: bnToString(eth_amount), gasPrice: 0})
 
     # check fund balance
     newFundBalance = BigNumber(await this.fund.totalFundsInDAI.call())
@@ -570,7 +570,7 @@ contract("price_changes", (accounts) ->
     amount = 10 * PRECISION
     await dai.mint(account, bnToString(amount), {from: owner}) # Mint DAI
     await dai.approve(this.fund.address, bnToString(amount), {from: account}) # Approve transfer
-    await this.fund.depositDAI(bnToString(amount), {from: account}) # Deposit for account
+    await this.fund.depositDAI(bnToString(amount), ZERO_ADDR, {from: account}) # Deposit for account
 
     await timeTravel(PHASE_LENGTHS[0])
     await this.fund.nextPhase({from: owner}) # Go to Manage phase
@@ -812,7 +812,7 @@ contract("community_initiated_upgrade", (accounts) ->
     for i in [1..3]
       await dai.mint(accounts[i], bnToString(depositAmount), {from: owner}) # Mint DAI
       await dai.approve(this.fund.address, bnToString(depositAmount), {from: accounts[i]}) # Approve transfer
-      await this.fund.depositDAI(bnToString(depositAmount), {from: accounts[i]}) # Deposit for account
+      await this.fund.depositDAI(bnToString(depositAmount), ZERO_ADDR, {from: accounts[i]}) # Deposit for account
 
     # move to the Manage phase
     this.fund = await FUND(1, 1, owner)
@@ -959,7 +959,7 @@ contract("developer_initiated_upgrade", (accounts) ->
     for i in [1..3]
       await dai.mint(accounts[i], bnToString(depositAmount), {from: owner}) # Mint DAI
       await dai.approve(this.fund.address, bnToString(depositAmount), {from: accounts[i]}) # Approve transfer
-      await this.fund.depositDAI(bnToString(depositAmount), {from: accounts[i]}) # Deposit for account
+      await this.fund.depositDAI(bnToString(depositAmount), ZERO_ADDR, {from: accounts[i]}) # Deposit for account
 
     # move to the Manage phase
     this.fund = await FUND(1, 1, owner)
@@ -1024,7 +1024,7 @@ contract("community_overrides_developer_upgrade", (accounts) ->
     for i in [1..3]
       await dai.mint(accounts[i], bnToString(depositAmount), {from: owner}) # Mint DAI
       await dai.approve(this.fund.address, bnToString(depositAmount), {from: accounts[i]}) # Approve transfer
-      await this.fund.depositDAI(bnToString(depositAmount), {from: accounts[i]}) # Deposit for account
+      await this.fund.depositDAI(bnToString(depositAmount), ZERO_ADDR, {from: accounts[i]}) # Deposit for account
 
     # move to the Manage phase
     this.fund = await FUND(1, 1, owner)

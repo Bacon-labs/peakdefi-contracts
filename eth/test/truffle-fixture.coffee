@@ -9,6 +9,9 @@ ShortCEtherOrder = artifacts.require "ShortCEtherOrder"
 CompoundOrderFactory = artifacts.require "CompoundOrderFactory"
 BetokenLogic = artifacts.require "BetokenLogic"
 BetokenLogic2 = artifacts.require "BetokenLogic2"
+BetokenLogic3 = artifacts.require "BetokenLogic3"
+PeakReward = artifacts.require "PeakReward"
+PeakStaking = artifacts.require "PeakStaking"
 
 BigNumber = require "bignumber.js"
 
@@ -148,6 +151,22 @@ module.exports = () ->
   BetokenLogic.setAsDeployed(BetokenLogicContract)
   BetokenLogic2Contract = await BetokenLogic2.new()
   BetokenLogic2.setAsDeployed(BetokenLogic2Contract)
+  BetokenLogic3Contract = await BetokenLogic3.new()
+  BetokenLogic3.setAsDeployed(BetokenLogic3Contract)
+
+  # deploy PeakDeFi contracts
+  peakReferralTokenAddr = (await minimeFactory.createCloneToken(
+      ZERO_ADDR, 0, "Peak Referral Token", 18, "PRT", true)).logs[0].args.addr
+  PeakReferralToken = await MiniMeToken.at(peakReferralTokenAddr)
+  peakTokenAddr = (await testTokenFactory.newToken("MarketPeak", "PEAK", 8)).logs[0].args.addr
+  PeakToken = await TestToken.at(peakTokenAddr)
+  await PeakToken.mint(accounts[0], bnToString(1e7 * 1e8)) # ten million PEAK
+  PeakStakingContract = await PeakStaking.new(PeakToken.address)
+  PeakStaking.setAsDeployed(PeakStakingContract)
+  await PeakToken.addMinter(PeakStakingContract.address)
+  PeakRewardContract = await PeakReward.new(accounts[0], PeakStakingContract.address)
+  PeakReward.setAsDeployed(PeakRewardContract)
+  await PeakStakingContract.init(PeakRewardContract.address)
 
   # deploy BetokenFund contract
   compoundTokensArray = (compoundTokens[token] for token in tokenAddrs[0..tokenAddrs.length - 3])
@@ -165,13 +184,15 @@ module.exports = () ->
     BetokenLogicContract.address,
     BetokenLogic2Contract.address,
     1,
-    ZERO_ADDR
+    ZERO_ADDR,
+    BetokenLogic3Contract.address,
+    PeakRewardContract.address,
+    PeakReferralToken.address
   ))
   betokenFund = await BetokenFund.deployed()
   await betokenFund.initTokenListings(
     tokenAddrs[0..tokenAddrs.length - 3].concat([ETH_ADDR]),
-    compoundTokensArray,
-    []
+    compoundTokensArray
   )
 
   # deploy BetokenProxy contract
@@ -185,5 +206,6 @@ module.exports = () ->
 
   await ControlToken.transferOwnership(betokenFund.address)
   await ShareToken.transferOwnership(betokenFund.address)
+  await PeakReferralToken.transferOwnership(betokenFund.address)
 
   await betokenFund.nextPhase()

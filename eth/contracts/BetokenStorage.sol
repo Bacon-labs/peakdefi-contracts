@@ -77,6 +77,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
   // Address of the BetokenLogic contract.
   address public betokenLogic;
   address public betokenLogic2;
+  address public betokenLogic3;
 
   // Address to which the development team funding will be sent.
   address payable public devFundingAccount;
@@ -140,9 +141,6 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
 
   // Checks if an address points to a whitelisted Compound token. Returns false for cDAI and other stablecoin CompoundTokens.
   mapping(address => bool) public isCompoundToken;
-
-  // Check if an address points to a whitelisted Fulcrum position token.
-  mapping(address => bool) public isPositionToken;
 
   // The current cycle phase.
   CyclePhase public cyclePhase;

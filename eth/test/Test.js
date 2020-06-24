@@ -182,7 +182,7 @@
       await dai.approve(this.fund.address, bnToString(amount), {
         from: account2
       });
-      await this.fund.depositDAI(bnToString(amount), {
+      await this.fund.depositDAI(bnToString(amount), ZERO_ADDR, {
         from: account2
       });
       await dai.approve(this.fund.address, 0, {
@@ -214,7 +214,7 @@
       await token.approve(this.fund.address, bnToString(amount), {
         from: account
       });
-      await this.fund.depositToken(token.address, bnToString(amount), {
+      await this.fund.depositToken(token.address, bnToString(amount), ZERO_ADDR, {
         from: account
       });
       await token.approve(this.fund.address, 0, {
@@ -242,7 +242,7 @@
       fundBalance = BigNumber((await this.fund.totalFundsInDAI.call()));
       prevETHBlnce = BigNumber((await web3.eth.getBalance(account3)));
       prevShareBlnce = BigNumber((await st.balanceOf.call(account3)));
-      await this.fund.depositEther({
+      await this.fund.depositEther(ZERO_ADDR, {
         from: account3,
         value: bnToString(eth_amount),
         gasPrice: 0
@@ -631,7 +631,7 @@
       await dai.approve(this.fund.address, bnToString(amount), {
         from: account // Approve transfer
       });
-      await this.fund.depositDAI(bnToString(amount), {
+      await this.fund.depositDAI(bnToString(amount), ZERO_ADDR, {
         from: account // Deposit for account
       });
       await timeTravel(PHASE_LENGTHS[0]);
@@ -915,7 +915,7 @@
         await dai.approve(this.fund.address, bnToString(depositAmount), {
           from: accounts[i]
         });
-        await this.fund.depositDAI(bnToString(depositAmount), {
+        await this.fund.depositDAI(bnToString(depositAmount), ZERO_ADDR, {
           from: accounts[i]
         });
       }
@@ -1080,7 +1080,7 @@
         await dai.approve(this.fund.address, bnToString(depositAmount), {
           from: accounts[i]
         });
-        await this.fund.depositDAI(bnToString(depositAmount), {
+        await this.fund.depositDAI(bnToString(depositAmount), ZERO_ADDR, {
           from: accounts[i]
         });
       }
@@ -1152,7 +1152,7 @@
         await dai.approve(this.fund.address, bnToString(depositAmount), {
           from: accounts[i]
         });
-        await this.fund.depositDAI(bnToString(depositAmount), {
+        await this.fund.depositDAI(bnToString(depositAmount), ZERO_ADDR, {
           from: accounts[i]
         });
       }
