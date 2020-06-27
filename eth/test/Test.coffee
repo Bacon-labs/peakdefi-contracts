@@ -12,6 +12,10 @@ TestCERC20 = artifacts.require "TestCERC20"
 TestCEther = artifacts.require "TestCEther"
 TestCERC20Factory = artifacts.require "TestCERC20Factory"
 
+PeakReward = artifacts.require "PeakReward"
+PeakStaking = artifacts.require "PeakStaking"
+PEAK_PRECISION = 1e8
+
 BigNumber = require "bignumber.js"
 
 epsilon = 1e-3
@@ -1145,5 +1149,100 @@ contract("community_overrides_developer_upgrade", (accounts) ->
     # check BetokenProxy
     proxy = await BetokenProxy.deployed()
     assert.equal(await proxy.betokenFundAddress.call(), accounts[1], "BetokenFund address incorrect in BetokenProxy")
+  )
+)
+
+contract("peak_staking", (accounts) ->
+  stakeAmount = 1e6 * PEAK_PRECISION
+  stakeTimeInDays = 100
+  peakStaking = null
+  peakToken = null
+
+  it("stake()", () ->
+    peakStaking = await PeakStaking.deployed()
+    peakToken = await TestToken.at(await peakStaking.peakToken())
+
+    # stake without referrer
+    await peakToken.approve(peakStaking.address, bnToString(stakeAmount))
+    await peakStaking.stake(bnToString(stakeAmount), stakeTimeInDays, ZERO_ADDR)
+
+    # stake with referrer
+    beforeBalance0 = await peakToken.balanceOf(accounts[0])
+    beforeBalance1 = await peakToken.balanceOf(accounts[1])
+    await peakToken.approve(peakStaking.address, bnToString(stakeAmount))
+    await peakStaking.stake(bnToString(stakeAmount), stakeTimeInDays, accounts[1])
+    balanceChange0 = BigNumber(await peakToken.balanceOf(accounts[0])).minus(beforeBalance0)
+    balanceChange1 = BigNumber(await peakToken.balanceOf(accounts[1])).minus(beforeBalance1)
+    expectedInterest = BigNumber(await peakStaking.getInterestAmount(bnToString(stakeAmount), stakeTimeInDays))
+    expectedReward0 = BigNumber(expectedInterest).times(0.03)
+    expectedReward1 = BigNumber(expectedInterest).times(0.1)
+    actualReward0 = BigNumber(balanceChange0).plus(stakeAmount)
+    assert(epsilon_equal(expectedReward0, actualReward0), "staker reward incorrect")
+    assert(epsilon_equal(expectedReward1, balanceChange1), "referrer reward incorrect")
+  )
+
+  it("withdraw()", () ->
+    # time travel to stake maturation
+    await timeTravel(100 * DAY)
+
+    # withdraw stake #0
+    beforeBalance = await peakToken.balanceOf(accounts[0])
+    await peakStaking.withdraw(0)
+    balanceChange = BigNumber(await peakToken.balanceOf(accounts[0])).minus(beforeBalance)
+    expectedInterest = BigNumber(await peakStaking.getInterestAmount(bnToString(stakeAmount), stakeTimeInDays))
+    actualInterest = balanceChange.minus(stakeAmount)
+    assert(epsilon_equal(actualInterest, expectedInterest), "Interest amount incorrect for stake #0")
+
+    # withdraw stake #1
+    beforeBalance = await peakToken.balanceOf(accounts[0])
+    await peakStaking.withdraw(1)
+    balanceChange = BigNumber(await peakToken.balanceOf(accounts[0])).minus(beforeBalance)
+    expectedInterest = BigNumber(await peakStaking.getInterestAmount(bnToString(stakeAmount), stakeTimeInDays))
+    actualInterest = balanceChange.minus(stakeAmount)
+    assert(epsilon_equal(actualInterest, expectedInterest), "Interest amount incorrect for stake #1")
+  )
+)
+
+contract("peak_reward", (accounts) ->
+  peakReward = null
+
+  it("refer()", () ->
+    peakReward = await PeakReward.deployed()
+
+    # set accounts[1] as the referrer of accounts[2]
+    await peakReward.refer(accounts[2], accounts[1])
+
+    # verify
+    actualReferrer = await peakReward.referrerOf(accounts[2])
+    assert.equal(accounts[1], actualReferrer, "referrer not set correctly")
+  )
+
+  it("canRefer()", () ->
+    assert.equal(true, await peakReward.canRefer(accounts[3], accounts[2]), "cannot refer when should be able to")
+
+    # set accounts[2] as the referrer of accounts[3]
+    await peakReward.refer(accounts[3], accounts[2])
+
+    assert.equal(false, await peakReward.canRefer(accounts[3], accounts[2]), "can refer after referral")
+  )
+
+  it("payCommission()", () ->
+
+  )
+
+  it("incrementCareerValueInDai()", () ->
+
+  )
+
+  it("decrementCareerValueInDai()", () ->
+
+  )
+
+  it("incrementCareerValueInPeak()", () ->
+
+  )
+
+  it("rankOf()", () ->
+
   )
 )

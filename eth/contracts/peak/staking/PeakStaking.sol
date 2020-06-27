@@ -106,8 +106,7 @@ contract PeakStaking {
             peakToken.burn(leftoverAmount);
 
             // pay referral bonus to staker
-            uint256 referralStakerBonus = rawCommission
-                .sub(leftoverAmount)
+            uint256 referralStakerBonus = interestAmount
                 .mul(REFERRAL_STAKER_BONUS)
                 .div(PRECISION);
             peakToken.mint(msg.sender, referralStakerBonus);
@@ -130,6 +129,9 @@ contract PeakStaking {
             withdrawAmount = stakeObj.stakeAmount.add(stakeObj.interestAmount).sub(stakeObj.withdrawnInterestAmount);
             stakeObj.active = false;
             stakeObj.withdrawnInterestAmount = stakeObj.interestAmount;
+            userStakeAmount[msg.sender] = userStakeAmount[msg.sender].sub(
+                stakeObj.stakeAmount
+            );
         } else {
             // not mature, partial withdraw
             withdrawAmount = stakeObj

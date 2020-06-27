@@ -176,13 +176,14 @@
     PeakReferralToken = (await MiniMeToken.at(peakReferralTokenAddr));
     peakTokenAddr = ((await testTokenFactory.newToken("MarketPeak", "PEAK", 8))).logs[0].args.addr;
     PeakToken = (await TestToken.at(peakTokenAddr));
-    await PeakToken.mint(accounts[0], bnToString(1e7 * 1e8)); // ten million PEAK
+    await PeakToken.mint(accounts[0], bnToString(1e9 * 1e8)); // 1 billion PEAK
     PeakStakingContract = (await PeakStaking.new(PeakToken.address));
     PeakStaking.setAsDeployed(PeakStakingContract);
     await PeakToken.addMinter(PeakStakingContract.address);
     PeakRewardContract = (await PeakReward.new(accounts[0], PeakStakingContract.address));
     PeakReward.setAsDeployed(PeakRewardContract);
     await PeakStakingContract.init(PeakRewardContract.address);
+    await PeakRewardContract.addSigner(PeakStakingContract.address);
     // deploy BetokenFund contract
     compoundTokensArray = (function() {
       var len4, n, ref3, results;
@@ -206,6 +207,7 @@
     await ControlToken.transferOwnership(betokenFund.address);
     await ShareToken.transferOwnership(betokenFund.address);
     await PeakReferralToken.transferOwnership(betokenFund.address);
+    await PeakRewardContract.addSigner(betokenFund.address);
     return (await betokenFund.nextPhase());
   };
 

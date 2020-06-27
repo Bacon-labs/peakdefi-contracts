@@ -224,5 +224,6 @@ contract PeakReward is SignerRole {
      */
     function _getPeakPriceInDai() internal view returns (uint256) {
         // TODO: connect with Uniswap PEAK market
+        return PRECISION.mul(12).div(100);
     }
 }
