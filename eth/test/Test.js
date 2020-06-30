@@ -1339,11 +1339,23 @@
   });
 
   contract("peak_reward", function(accounts) {
-    var peakReward;
+    var dai, fund, peakReward, peakStaking, peakToken, stakeAmount, stakeTimeInDays;
+    stakeAmount = 1e6 * PEAK_PRECISION;
+    stakeTimeInDays = 100;
     peakReward = null;
+    peakStaking = null;
+    peakToken = null;
+    fund = null;
+    dai = null;
+    it("prep_work", async function() {
+      peakReward = (await PeakReward.deployed());
+      peakStaking = (await PeakStaking.deployed());
+      peakToken = (await TestToken.at((await peakStaking.peakToken())));
+      fund = (await FUND(1, 0, accounts[0]));
+      return dai = (await DAI(fund));
+    });
     it("refer()", async function() {
       var actualReferrer;
-      peakReward = (await PeakReward.deployed());
       // set accounts[1] as the referrer of accounts[2]
       await peakReward.refer(accounts[2], accounts[1]);
       // verify
@@ -1356,11 +1368,46 @@
       await peakReward.refer(accounts[3], accounts[2]);
       return assert.equal(false, (await peakReward.canRefer(accounts[3], accounts[2])), "can refer after referral");
     });
-    it("payCommission()", function() {});
-    it("incrementCareerValueInDai()", function() {});
-    it("decrementCareerValueInDai()", function() {});
-    it("incrementCareerValueInPeak()", function() {});
-    return it("rankOf()", function() {});
+    return it("payCommission()", async function() {
+      var balanceChange1, balanceChange2, balanceChange3, beforeBalance1, beforeBalance2, beforeBalance3, expectedReward1, expectedReward2, expectedReward3, rawCommissionAmount;
+      // pay commission to accounts[3], with no stakes
+      rawCommissionAmount = PRECISION;
+      beforeBalance3 = BigNumber((await dai.balanceOf(accounts[3])));
+      await dai.approve(peakReward.address, bnToString(rawCommissionAmount));
+      await peakReward.payCommission(accounts[3], dai.address, bnToString(rawCommissionAmount), false);
+      balanceChange3 = BigNumber((await dai.balanceOf(accounts[3]))).minus(beforeBalance3);
+      expectedReward3 = rawCommissionAmount * 0.1 / 0.2;
+      assert(epsilon_equal(balanceChange3, expectedReward3), "account[3] commission incorrect (no stakes)");
+      // pay commission to accounts[3], with stakes
+      await peakToken.transfer(accounts[1], bnToString(stakeAmount));
+      await peakToken.approve(peakStaking.address, bnToString(stakeAmount), {
+        from: accounts[1]
+      });
+      await peakStaking.stake(bnToString(stakeAmount), stakeTimeInDays, ZERO_ADDR, {
+        from: accounts[1]
+      });
+      await peakToken.transfer(accounts[2], bnToString(stakeAmount));
+      await peakToken.approve(peakStaking.address, bnToString(stakeAmount), {
+        from: accounts[2]
+      });
+      await peakStaking.stake(bnToString(stakeAmount), stakeTimeInDays, ZERO_ADDR, {
+        from: accounts[2]
+      });
+      beforeBalance1 = BigNumber((await dai.balanceOf(accounts[1])));
+      beforeBalance2 = BigNumber((await dai.balanceOf(accounts[2])));
+      beforeBalance3 = BigNumber((await dai.balanceOf(accounts[3])));
+      await dai.approve(peakReward.address, bnToString(rawCommissionAmount));
+      await peakReward.payCommission(accounts[3], dai.address, bnToString(rawCommissionAmount), false);
+      balanceChange1 = BigNumber((await dai.balanceOf(accounts[1]))).minus(beforeBalance1);
+      balanceChange2 = BigNumber((await dai.balanceOf(accounts[2]))).minus(beforeBalance2);
+      balanceChange3 = BigNumber((await dai.balanceOf(accounts[3]))).minus(beforeBalance3);
+      expectedReward1 = rawCommissionAmount * 0.02 / 0.2;
+      expectedReward2 = rawCommissionAmount * 0.04 / 0.2;
+      expectedReward3 = rawCommissionAmount * 0.1 / 0.2;
+      assert(epsilon_equal(balanceChange1, expectedReward1), "account[1] commission incorrect");
+      assert(epsilon_equal(balanceChange2, expectedReward2), "account[2] commission incorrect");
+      return assert(epsilon_equal(balanceChange3, expectedReward3), "account[3] commission incorrect");
+    });
   });
 
 }).call(this);

@@ -1204,11 +1204,24 @@ contract("peak_staking", (accounts) ->
 )
 
 contract("peak_reward", (accounts) ->
+  stakeAmount = 1e6 * PEAK_PRECISION
+  stakeTimeInDays = 100
+
   peakReward = null
+  peakStaking = null
+  peakToken = null
+  fund = null
+  dai = null
+
+  it("prep_work", () ->
+    peakReward = await PeakReward.deployed()
+    peakStaking = await PeakStaking.deployed()
+    peakToken = await TestToken.at(await peakStaking.peakToken())
+    fund = await FUND(1, 0, accounts[0])
+    dai = await DAI(fund)
+  )
 
   it("refer()", () ->
-    peakReward = await PeakReward.deployed()
-
     # set accounts[1] as the referrer of accounts[2]
     await peakReward.refer(accounts[2], accounts[1])
 
@@ -1227,22 +1240,37 @@ contract("peak_reward", (accounts) ->
   )
 
   it("payCommission()", () ->
+    # pay commission to accounts[3], with no stakes
+    rawCommissionAmount = PRECISION
+    beforeBalance3 = BigNumber(await dai.balanceOf(accounts[3]))
+    await dai.approve(peakReward.address, bnToString(rawCommissionAmount))
+    await peakReward.payCommission(accounts[3], dai.address, bnToString(rawCommissionAmount), false)
+    balanceChange3 = BigNumber(await dai.balanceOf(accounts[3])).minus(beforeBalance3)
+    expectedReward3 = rawCommissionAmount * 0.1 / 0.2
+    assert(epsilon_equal(balanceChange3, expectedReward3), "account[3] commission incorrect (no stakes)")
 
-  )
+    # pay commission to accounts[3], with stakes
+    await peakToken.transfer(accounts[1], bnToString(stakeAmount))
+    await peakToken.approve(peakStaking.address, bnToString(stakeAmount), {from: accounts[1]})
+    await peakStaking.stake(bnToString(stakeAmount), stakeTimeInDays, ZERO_ADDR, {from: accounts[1]})
 
-  it("incrementCareerValueInDai()", () ->
-
-  )
-
-  it("decrementCareerValueInDai()", () ->
-
-  )
-
-  it("incrementCareerValueInPeak()", () ->
-
-  )
-
-  it("rankOf()", () ->
-
+    await peakToken.transfer(accounts[2], bnToString(stakeAmount))
+    await peakToken.approve(peakStaking.address, bnToString(stakeAmount), {from: accounts[2]})
+    await peakStaking.stake(bnToString(stakeAmount), stakeTimeInDays, ZERO_ADDR, {from: accounts[2]})
+    
+    beforeBalance1 = BigNumber(await dai.balanceOf(accounts[1]))
+    beforeBalance2 = BigNumber(await dai.balanceOf(accounts[2]))
+    beforeBalance3 = BigNumber(await dai.balanceOf(accounts[3]))
+    await dai.approve(peakReward.address, bnToString(rawCommissionAmount))
+    await peakReward.payCommission(accounts[3], dai.address, bnToString(rawCommissionAmount), false)
+    balanceChange1 = BigNumber(await dai.balanceOf(accounts[1])).minus(beforeBalance1)
+    balanceChange2 = BigNumber(await dai.balanceOf(accounts[2])).minus(beforeBalance2)
+    balanceChange3 = BigNumber(await dai.balanceOf(accounts[3])).minus(beforeBalance3)
+    expectedReward1 = rawCommissionAmount * 0.02 / 0.2
+    expectedReward2 = rawCommissionAmount * 0.04 / 0.2
+    expectedReward3 = rawCommissionAmount * 0.1 / 0.2
+    assert(epsilon_equal(balanceChange1, expectedReward1), "account[1] commission incorrect")
+    assert(epsilon_equal(balanceChange2, expectedReward2), "account[2] commission incorrect")
+    assert(epsilon_equal(balanceChange3, expectedReward3), "account[3] commission incorrect")
   )
 )
