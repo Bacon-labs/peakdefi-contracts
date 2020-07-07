@@ -41,7 +41,7 @@ contract BetokenLogic3 is BetokenStorage, Utils(address(0), address(0), address(
       require(hasInitializedTokenListings); // has initialized token listings
 
       // execute initialization function
-      init();
+      __init();
 
       require(previousVersion == address(0) || (previousVersion != address(0) && getBalance(dai, address(this)) > 0)); // has transfered assets from previous version
     } else {
@@ -132,7 +132,7 @@ contract BetokenLogic3 is BetokenStorage, Utils(address(0), address(0), address(
   /**
    * @notice Initializes several important variables after smart contract upgrade
    */
-  function init() internal {
+  function __init() internal {
     _managePhaseEndBlock[cycleNumber.sub(1)] = block.number;
 
     // load values from previous version

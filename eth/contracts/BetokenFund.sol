@@ -7,7 +7,7 @@ import "./derivatives/CompoundOrderFactory.sol";
  * @title The main smart contract of the Betoken hedge fund.
  * @author Zefram Lou (Zebang Liu)
  */
-contract BetokenFund is BetokenStorage, Utils, TokenController {
+contract BetokenFund is BetokenStorage, Utils(address(0), address(0), address(0)), TokenController {
   /**
    * @notice Passes if the fund is ready for migrating to the next version
    */
@@ -22,11 +22,9 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
    * Meta functions
    */
 
-  constructor(
-    address payable _kroAddr,
-    address payable _sTokenAddr,
+  function init(
     address payable _devFundingAccount,
-    uint256[2] memory _phaseLengths,
+    uint256[2] calldata _phaseLengths,
     uint256 _devFundingRate,
     address payable _previousVersion,
     address _daiAddr,
@@ -34,17 +32,11 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
     address _compoundFactoryAddr,
     address _betokenLogic,
     address _betokenLogic2,
+    address _betokenLogic3,
     uint256 _startCycleNumber,
     address payable _dexagAddr,
-    address _betokenLogic3,
-    address _peakRewardAddr,
-    address payable _peakReferralTokenAddr
-  )
-    public
-    Utils(_daiAddr, _kyberAddr, _dexagAddr)
-  {
-    controlTokenAddr = _kroAddr;
-    shareTokenAddr = _sTokenAddr;
+    address _peakRewardAddr
+  ) external {
     devFundingAccount = _devFundingAccount;
     phaseLengths = _phaseLengths;
     devFundingRate = _devFundingRate;
@@ -56,9 +48,25 @@ contract BetokenFund is BetokenStorage, Utils, TokenController {
     previousVersion = _previousVersion;
     cycleNumber = _startCycleNumber;
 
+    peakReward = PeakReward(_peakRewardAddr);
+
+    DAI_ADDR = _daiAddr;
+    KYBER_ADDR = _kyberAddr;
+    DEXAG_ADDR = _dexagAddr;
+
+    dai = ERC20Detailed(_daiAddr);
+    kyber = KyberNetwork(_kyberAddr);
+  }
+
+  function initInternalTokens(
+    address payable _kroAddr,
+    address payable _sTokenAddr,
+    address payable _peakReferralTokenAddr
+  ) public onlyOwner {
+    controlTokenAddr = _kroAddr;
+    shareTokenAddr = _sTokenAddr;
     cToken = IMiniMeToken(_kroAddr);
     sToken = IMiniMeToken(_sTokenAddr);
-    peakReward = PeakReward(_peakRewardAddr);
     peakReferralToken = IMiniMeToken(_peakReferralTokenAddr);
   }
 

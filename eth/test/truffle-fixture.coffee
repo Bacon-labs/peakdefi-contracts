@@ -184,9 +184,9 @@ module.exports = () ->
     CompoundOrderFactoryContract.address,
     BetokenLogicContract.address,
     BetokenLogic2Contract.address,
+    BetokenLogic3Contract.address,
     1,
     ZERO_ADDR,
-    BetokenLogic3Contract.address,
     PeakRewardContract.address,
     PeakReferralToken.address
   ))
