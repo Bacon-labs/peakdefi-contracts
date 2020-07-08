@@ -4,7 +4,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20Detailed.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/KyberNetwork.sol";
-import "./interfaces/Dexag.sol";
+import "./interfaces/OneInchExchange.sol";
 
 /**
  * @title The smart contract for useful utility functions and constants.
@@ -175,8 +175,8 @@ contract Utils {
     // Note: _actualSrcAmount is being used as msgValue here, because otherwise we'd run into the stack too deep error
     if (_srcToken != ETH_TOKEN_ADDRESS) {
       _actualSrcAmount = 0;
-      Dexag dex = Dexag(DEXAG_ADDR);
-      address approvalHandler = dex.approvalHandler();
+      OneInchExchange dex = OneInchExchange(DEXAG_ADDR);
+      address approvalHandler = dex.spender();
       _srcToken.safeApprove(approvalHandler, 0);
       _srcToken.safeApprove(approvalHandler, _srcAmount);
     } else {

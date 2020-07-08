@@ -46,6 +46,7 @@ contract BetokenFactory is CloneFactory {
     function createFund() external returns (BetokenFund) {
         // create fund
         BetokenFund fund = BetokenFund(createClone(betokenFund).toPayable());
+        fund.initOwner();
 
         // deploy and set BetokenProxy
         BetokenProxy proxy = new BetokenProxy(address(fund));

@@ -58,11 +58,15 @@ contract BetokenFund is BetokenStorage, Utils(address(0), address(0), address(0)
     kyber = KyberNetwork(_kyberAddr);
   }
 
+  function initOwner() external {
+    _transferOwnership(msg.sender);
+  }
+
   function initInternalTokens(
     address payable _kroAddr,
     address payable _sTokenAddr,
     address payable _peakReferralTokenAddr
-  ) public onlyOwner {
+  ) external onlyOwner {
     controlTokenAddr = _kroAddr;
     shareTokenAddr = _sTokenAddr;
     cToken = IMiniMeToken(_kroAddr);
@@ -71,10 +75,10 @@ contract BetokenFund is BetokenStorage, Utils(address(0), address(0), address(0)
   }
 
   function initTokenListings(
-    address[] memory _kyberTokens,
-    address[] memory _compoundTokens
+    address[] calldata _kyberTokens,
+    address[] calldata _compoundTokens
   )
-    public
+    external
     onlyOwner
   {
     // May only initialize once
@@ -95,7 +99,7 @@ contract BetokenFund is BetokenStorage, Utils(address(0), address(0), address(0)
    * @notice Used during deployment to set the BetokenProxy contract address.
    * @param _proxyAddr the proxy's address
    */
-  function setProxy(address payable _proxyAddr) public onlyOwner {
+  function setProxy(address payable _proxyAddr) external onlyOwner {
     require(_proxyAddr != address(0));
     require(proxyAddr == address(0));
     proxyAddr = _proxyAddr;
