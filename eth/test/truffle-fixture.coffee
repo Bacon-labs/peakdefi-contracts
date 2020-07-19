@@ -172,9 +172,15 @@ module.exports = () ->
   # deploy BetokenFund contract
   compoundTokensArray = (compoundTokens[token] for token in tokenAddrs[0..tokenAddrs.length - 3])
   compoundTokensArray.push(TestCEtherContract.address)
-  BetokenFund.setAsDeployed(await BetokenFund.new(
+  BetokenFund.setAsDeployed(await BetokenFund.new())
+  betokenFund = await BetokenFund.deployed()
+  await betokenFund.initOwner()
+  await betokenFund.initInternalTokens(
     ControlToken.address,
     ShareToken.address,
+    PeakReferralToken.address
+  )
+  await betokenFund.init(
     accounts[0], #devFundingAccount
     config.phaseLengths,
     bnToString(config.devFundingRate),
@@ -187,10 +193,8 @@ module.exports = () ->
     BetokenLogic3Contract.address,
     1,
     ZERO_ADDR,
-    PeakRewardContract.address,
-    PeakReferralToken.address
-  ))
-  betokenFund = await BetokenFund.deployed()
+    PeakRewardContract.address
+  )
   await betokenFund.initTokenListings(
     tokenAddrs[0..tokenAddrs.length - 3].concat([ETH_ADDR]),
     compoundTokensArray

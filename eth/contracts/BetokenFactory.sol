@@ -10,6 +10,7 @@ contract BetokenFactory is CloneFactory {
     using Address for address;
 
     event CreateFund(address fund);
+    event InitFund(address fund);
 
     address public daiAddr;
     address payable public kyberAddr;
@@ -47,10 +48,6 @@ contract BetokenFactory is CloneFactory {
         // create fund
         BetokenFund fund = BetokenFund(createClone(betokenFund).toPayable());
         fund.initOwner();
-
-        // deploy and set BetokenProxy
-        BetokenProxy proxy = new BetokenProxy(address(fund));
-        fund.setProxy(address(proxy).toPayable());
 
         // give PeakReward signer rights to fund
         PeakReward peakReward = PeakReward(peakRewardAddr);
@@ -112,7 +109,13 @@ contract BetokenFactory is CloneFactory {
             peakRewardAddr
         );
 
+        // deploy and set BetokenProxy
+        BetokenProxy proxy = new BetokenProxy(address(fund));
+        fund.setProxy(address(proxy).toPayable());
+
         // transfer fund ownership to msg.sender
         fund.transferOwnership(msg.sender);
+
+        emit InitFund(address(fund));
     }
 }

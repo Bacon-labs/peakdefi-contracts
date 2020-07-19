@@ -37,6 +37,7 @@ contract BetokenFund is BetokenStorage, Utils(address(0), address(0), address(0)
     address payable _dexagAddr,
     address _peakRewardAddr
   ) external {
+    require(proxyAddr == address(0));
     devFundingAccount = _devFundingAccount;
     phaseLengths = _phaseLengths;
     devFundingRate = _devFundingRate;
@@ -59,6 +60,7 @@ contract BetokenFund is BetokenStorage, Utils(address(0), address(0), address(0)
   }
 
   function initOwner() external {
+    require(proxyAddr == address(0));
     _transferOwnership(msg.sender);
   }
 
@@ -67,6 +69,7 @@ contract BetokenFund is BetokenStorage, Utils(address(0), address(0), address(0)
     address payable _sTokenAddr,
     address payable _peakReferralTokenAddr
   ) external onlyOwner {
+    require(proxyAddr == address(0));
     controlTokenAddr = _kroAddr;
     shareTokenAddr = _sTokenAddr;
     cToken = IMiniMeToken(_kroAddr);
