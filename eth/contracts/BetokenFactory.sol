@@ -10,7 +10,7 @@ contract BetokenFactory is CloneFactory {
     using Address for address;
 
     event CreateFund(address fund);
-    event InitFund(address fund);
+    event InitFund(address fund, address proxy);
 
     address public daiAddr;
     address payable public kyberAddr;
@@ -116,6 +116,6 @@ contract BetokenFactory is CloneFactory {
         // transfer fund ownership to msg.sender
         fund.transferOwnership(msg.sender);
 
-        emit InitFund(address(fund));
+        emit InitFund(address(fund), address(proxy));
     }
 }

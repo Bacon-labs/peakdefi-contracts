@@ -439,13 +439,6 @@ contract BetokenFund is BetokenStorage, Utils(address(0), address(0), address(0)
     if (!success) { revert(); }
   }
 
-  function sellLeftoverFulcrumToken(address _tokenAddr)
-    public
-  {
-    (bool success,) = betokenLogic2.delegatecall(abi.encodeWithSelector(this.sellLeftoverFulcrumToken.selector, _tokenAddr));
-    if (!success) { revert(); }
-  }
-
   /**
    * @notice Sells CompoundOrder left over due to manager not selling or KyberNetwork not having enough volume. Callable by anyone. Money goes to developer.
    * @param _orderAddress address of the CompoundOrder to be sold
