@@ -12,8 +12,21 @@ contract PeakReward is SignerRole {
     using SafeERC20 for IERC20;
 
     modifier regUser(address user) {
-        isUser[user] = true;
+        if (!isUser[user]) {
+            isUser[user] = true;
+            numUsersWithRank[0] = numUsersWithRank[0].add(1);
+        }
         _;
+    }
+
+    modifier checkRankChange(address user) {
+        uint256 beforeRank = rankOf(user);
+        _;
+        uint256 afterRank = rankOf(user);
+        if (beforeRank != afterRank) {
+            numUsersWithRank[beforeRank] = numUsersWithRank[beforeRank].sub(1);
+            numUsersWithRank[afterRank] = numUsersWithRank[afterRank].add(1);
+        }
     }
 
     uint256 internal constant COMMISSION_RATE = 20 * (10**16); // 20%
@@ -24,9 +37,11 @@ contract PeakReward is SignerRole {
     mapping(address => address) public referrerOf;
     mapping(address => bool) public isUser;
     mapping(address => uint256) public careerValue;
+    mapping(uint256 => uint256) public numUsersWithRank;
 
     uint256[] public commissionPercentages;
     uint256[] public commissionStakeRequirements;
+    uint256[] public rankRewardPercentages;
 
     address public marketPeakWallet;
     PeakStaking public peakStaking;
@@ -52,6 +67,19 @@ contract PeakReward is SignerRole {
         commissionStakeRequirements.push(PEAK_PRECISION.mul(9000));
         commissionStakeRequirements.push(PEAK_PRECISION.mul(10000));
 
+        // initialize rank reward percentages for each rank
+        rankRewardPercentages.push(0); // 0%
+        rankRewardPercentages.push(1 * (10**16)); // 1%
+        rankRewardPercentages.push(2 * (10**16)); // 2%
+        rankRewardPercentages.push(3 * (10**16)); // 3%
+        rankRewardPercentages.push(4 * (10**16)); // 4%
+        rankRewardPercentages.push(5 * (10**16)); // 5%
+        rankRewardPercentages.push(6 * (10**16)); // 6%
+        rankRewardPercentages.push(7 * (10**16)); // 7%
+        rankRewardPercentages.push(12 * (10**16)); // 12%
+        rankRewardPercentages.push(20 * (10**16)); // 20%
+        rankRewardPercentages.push(40 * (10**16)); // 40%
+
         marketPeakWallet = _marketPeakWallet;
         peakStaking = PeakStaking(_peakStaking);
     }
@@ -73,6 +101,8 @@ contract PeakReward is SignerRole {
         isUser[referrer] = true;
 
         referrerOf[user] = referrer;
+
+        numUsersWithRank[0] = numUsersWithRank[0].add(1);
     }
 
     function canRefer(address user, address referrer) public view returns (bool) {
