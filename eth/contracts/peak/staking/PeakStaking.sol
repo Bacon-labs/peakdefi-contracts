@@ -10,6 +10,10 @@ contract PeakStaking {
     using SafeMath for uint256;
     using SafeERC20 for PeakToken;
 
+    event CreateStake(uint256 idx, address user, address referrer, uint256 stakeAmount, uint256 stakeTimeInDays, uint256 interestAmount);
+    event WithdrawReward(uint256 idx, address user, uint256 rewardAmount);
+    event WithdrawStake(uint256 idx, address user);
+
     uint256 internal constant PRECISION = 10**18;
     uint256 internal constant PEAK_PRECISION = 10**8;
     uint256 internal constant INTEREST_SLOPE = 2 * (10**8); // Interest rate factor drops to 0 at 5B mintedPeakTokens
@@ -116,6 +120,8 @@ contract PeakStaking {
             // increment referrer CV
             peakReward.incrementCareerValueInPeak(actualReferrer, interestAmount);
         }
+
+        emit CreateStake(stakeIdx, msg.sender, referrer, stakeAmount, stakeTimeInDays, interestAmount);
     }
 
     function withdraw(uint256 stakeIdx) public {
@@ -134,6 +140,9 @@ contract PeakStaking {
             userStakeAmount[msg.sender] = userStakeAmount[msg.sender].sub(
                 stakeObj.stakeAmount
             );
+
+            emit WithdrawReward(stakeIdx, msg.sender, stakeObj.interestAmount.sub(stakeObj.withdrawnInterestAmount));
+            emit WithdrawStake(stakeIdx, msg.sender);
         } else {
             // not mature, partial withdraw
             withdrawAmount = stakeObj
@@ -146,6 +155,8 @@ contract PeakStaking {
             stakeObj.withdrawnInterestAmount = stakeObj.withdrawnInterestAmount.add(
                 withdrawAmount
             );
+
+            emit WithdrawReward(stakeIdx, msg.sender, withdrawAmount);
         }
 
         // withdraw interest to sender

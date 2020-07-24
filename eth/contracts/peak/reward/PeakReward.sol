@@ -11,10 +11,16 @@ contract PeakReward is SignerRole {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
+    event Register(address user, address referrer);
+    event RankChange(address user, uint256 oldRank, uint256 newRank);
+    event PayCommission(address referrer, address receipient, address token, uint256 amount, uint8 level);
+    event ChangedCareerValue(address user, uint256 changeAmount, bool positive);
+
     modifier regUser(address user) {
         if (!isUser[user]) {
             isUser[user] = true;
             numUsersWithRank[0] = numUsersWithRank[0].add(1);
+            emit Register(user, address(0));
         }
         _;
     }
@@ -26,6 +32,7 @@ contract PeakReward is SignerRole {
         if (beforeRank != afterRank) {
             numUsersWithRank[beforeRank] = numUsersWithRank[beforeRank].sub(1);
             numUsersWithRank[afterRank] = numUsersWithRank[afterRank].add(1);
+            emit RankChange(user, beforeRank, afterRank);
         }
     }
 
@@ -103,6 +110,8 @@ contract PeakReward is SignerRole {
         referrerOf[user] = referrer;
 
         numUsersWithRank[0] = numUsersWithRank[0].add(1);
+
+        emit Register(user, referrer);
     }
 
     function canRefer(address user, address referrer) public view returns (bool) {
@@ -145,6 +154,7 @@ contract PeakReward is SignerRole {
                 }
                 token.safeTransfer(ptr, com);
                 commissionLeft = commissionLeft.sub(com);
+                emit PayCommission(referrer, ptr, commissionToken, com, i);
             }
 
             ptr = referrerOf[ptr];
@@ -174,6 +184,7 @@ contract PeakReward is SignerRole {
         onlySigner
     {
         careerValue[user] = careerValue[user].add(incCV);
+        emit ChangedCareerValue(user, incCV, true);
     }
 
     /**
@@ -188,7 +199,9 @@ contract PeakReward is SignerRole {
     {
         if (careerValue[user] >= decCV) {
             careerValue[user] = careerValue[user].sub(decCV);
+            emit ChangedCareerValue(user, decCV, false);
         } else {
+            emit ChangedCareerValue(user, careerValue[user], false);
             careerValue[user] = 0;
         }
     }
@@ -208,6 +221,7 @@ contract PeakReward is SignerRole {
             PEAK_PRECISION
         );
         careerValue[user] = careerValue[user].add(incCVInDai);
+        emit ChangedCareerValue(user, incCVInDai, true);
     }
 
     /**
