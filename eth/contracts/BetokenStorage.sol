@@ -189,6 +189,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
   event TotalCommissionPaid(uint256 indexed _cycleNumber, uint256 _totalCommissionInDAI);
 
   event Register(address indexed _manager, uint256 _donationInDAI, uint256 _kairoReceived);
+  event BurnDeadman(address indexed _manager, uint256 _kairoBurned);
 
   event SignaledUpgrade(uint256 indexed _cycleNumber, address indexed _sender, bool indexed _inSupport);
   event DeveloperInitiatedUpgrade(uint256 indexed _cycleNumber, address _candidate);

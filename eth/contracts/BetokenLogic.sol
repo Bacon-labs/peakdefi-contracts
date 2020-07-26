@@ -39,7 +39,9 @@ contract BetokenLogic is BetokenStorage, Utils(address(0), address(0), address(0
   {
     require(_deadman != address(this));
     require(cycleNumber.sub(lastActiveCycle(_deadman)) > INACTIVE_THRESHOLD);
-    require(cToken.destroyTokens(_deadman, cToken.balanceOf(_deadman)));
+    uint256 balance = cToken.balanceOf(_deadman);
+    require(cToken.destroyTokens(_deadman, balance));
+    emit BurnDeadman(_deadman, balance);
   }
 
   /**
