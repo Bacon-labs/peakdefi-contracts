@@ -34,7 +34,7 @@ contract BetokenLogic is BetokenStorage, Utils(address(0), address(0), address(0
    */
   function burnDeadman(address _deadman)
     public
-    nonReentrant
+    
     during(CyclePhase.Intermission)
   {
     require(_deadman != address(this));
@@ -118,7 +118,7 @@ contract BetokenLogic is BetokenStorage, Utils(address(0), address(0), address(0
   )
     public
     during(CyclePhase.Manage)
-    nonReentrant
+    
     isValidToken(_tokenAddress)
   {
     require(_minPrice <= _maxPrice);
@@ -173,7 +173,7 @@ contract BetokenLogic is BetokenStorage, Utils(address(0), address(0), address(0
   )
     public
     during(CyclePhase.Manage)
-    nonReentrant
+    
   {
     Investment storage investment = userInvestments[msg.sender][_investmentId];
     require(investment.buyPrice > 0 && investment.cycleNumber == cycleNumber && !investment.isSold);
@@ -272,7 +272,7 @@ contract BetokenLogic is BetokenStorage, Utils(address(0), address(0), address(0
   )
     public
     during(CyclePhase.Manage)
-    nonReentrant
+    
     isValidToken(_tokenAddress)
   {
     require(_minPrice <= _maxPrice);
@@ -313,7 +313,7 @@ contract BetokenLogic is BetokenStorage, Utils(address(0), address(0), address(0
   )
     public
     during(CyclePhase.Manage)
-    nonReentrant
+    
   {
     // Load order info
     require(userCompoundOrders[msg.sender][_orderId] != address(0));
@@ -343,7 +343,7 @@ contract BetokenLogic is BetokenStorage, Utils(address(0), address(0), address(0
    * @param _orderId the ID of the Compound order
    * @param _repayAmountInDAI amount of DAI to use for repaying debt
    */
-  function repayCompoundOrder(uint256 _orderId, uint256 _repayAmountInDAI) public during(CyclePhase.Manage) nonReentrant {
+  function repayCompoundOrder(uint256 _orderId, uint256 _repayAmountInDAI) public during(CyclePhase.Manage)  {
     // Load order info
     require(userCompoundOrders[msg.sender][_orderId] != address(0));
     CompoundOrder order = CompoundOrder(userCompoundOrders[msg.sender][_orderId]);
@@ -419,7 +419,7 @@ contract BetokenLogic is BetokenStorage, Utils(address(0), address(0), address(0
   function redeemCommission(bool _inShares)
     public
     during(CyclePhase.Intermission)
-    nonReentrant
+    
   {
     uint256 commission = __redeemCommission();
 
@@ -444,7 +444,7 @@ contract BetokenLogic is BetokenStorage, Utils(address(0), address(0), address(0
   function redeemCommissionForCycle(bool _inShares, uint256 _cycle)
     public
     during(CyclePhase.Intermission)
-    nonReentrant
+    
   {
     require(_cycle < cycleNumber);
 

@@ -39,7 +39,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
     public
     payable
     notReadyForUpgrade
-    nonReentrant
+    
   {
     // Buy DAI with ETH
     uint256 actualDAIDeposited;
@@ -66,7 +66,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
   function depositDAI(uint256 _daiAmount, address _referrer)
     public
     notReadyForUpgrade
-    nonReentrant
+    
   {
     dai.safeTransferFrom(msg.sender, address(this), _daiAmount);
 
@@ -85,7 +85,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
   function depositToken(address _tokenAddr, uint256 _tokenAmount, address _referrer)
     public
     notReadyForUpgrade
-    nonReentrant
+    
     isValidToken(_tokenAddr)
   {
     require(_tokenAddr != DAI_ADDR && _tokenAddr != address(ETH_TOKEN_ADDRESS));
@@ -119,7 +119,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
   function withdrawEther(uint256 _amountInDAI)
     public
     during(CyclePhase.Intermission)
-    nonReentrant
+    
   {
     // Buy ETH
     uint256 actualETHWithdrawn;
@@ -142,7 +142,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
   function withdrawDAI(uint256 _amountInDAI)
     public
     during(CyclePhase.Intermission)
-    nonReentrant
+    
   {
     __withdraw(_amountInDAI);
 
@@ -161,7 +161,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
   function withdrawToken(address _tokenAddr, uint256 _amountInDAI)
     public
     during(CyclePhase.Intermission)
-    nonReentrant
+    
     isValidToken(_tokenAddr)
   {
     require(_tokenAddr != DAI_ADDR && _tokenAddr != address(ETH_TOKEN_ADDRESS));
@@ -205,7 +205,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
    *         There's a max Kairo amount that can be bought, and excess payment will be sent back to sender.
    * @param _donationInDAI the amount of DAI to be used for registration
    */
-  function registerWithDAI(uint256 _donationInDAI) public nonReentrant during(CyclePhase.Manage) {
+  function registerWithDAI(uint256 _donationInDAI) public  during(CyclePhase.Intermission) {
     dai.safeTransferFrom(msg.sender, address(this), _donationInDAI);
 
     // if DAI value is greater than maximum allowed, return excess DAI to msg.sender
@@ -222,7 +222,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
    * @notice Registers `msg.sender` as a manager, using ETH as payment. The more one pays, the more Kairo one gets.
    *         There's a max Kairo amount that can be bought, and excess payment will be sent back to sender.
    */
-  function registerWithETH() public payable nonReentrant during(CyclePhase.Manage) {
+  function registerWithETH() public payable  during(CyclePhase.Intermission) {
     uint256 receivedDAI;
 
     // trade ETH for DAI
@@ -245,7 +245,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
    * @param _token the token to be used for payment
    * @param _donationInTokens the amount of tokens to be used for registration, should use the token's native decimals
    */
-  function registerWithToken(address _token, uint256 _donationInTokens) public nonReentrant during(CyclePhase.Manage) {
+  function registerWithToken(address _token, uint256 _donationInTokens) public  during(CyclePhase.Intermission) {
     require(_token != address(0) && _token != address(ETH_TOKEN_ADDRESS) && _token != DAI_ADDR);
     ERC20Detailed token = ERC20Detailed(_token);
     require(token.totalSupply() > 0);
@@ -273,7 +273,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
    */
   function sellLeftoverToken(address _tokenAddr)
     public
-    nonReentrant
+    
     during(CyclePhase.Intermission)
     isValidToken(_tokenAddr)
   {
@@ -288,7 +288,7 @@ contract BetokenLogic2 is BetokenStorage, Utils(address(0), address(0), address(
    */
   function sellLeftoverCompoundOrder(address payable _orderAddress)
     public
-    nonReentrant
+    
     during(CyclePhase.Intermission)
   {
     // Load order info

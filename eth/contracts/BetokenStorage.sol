@@ -47,6 +47,8 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
   uint256 public constant ROI_BURN_THRESHOLD = 25 * (10 ** 16); // ROI worse than 25% will see their stake all burned
   uint256 public constant ROI_PUNISH_SLOPE = 6; // kroROI = -(6 * absROI - 0.5)
   uint256 public constant ROI_PUNISH_NEG_BIAS = 5 * (10 ** 17); // kroROI = -(6 * absROI - 0.5)
+  uint256 public constant NEW_MANAGER_KAIRO = 100 * (10 ** 18);
+  uint256 public constant MAX_NEW_MANAGERS = 25;
   // Upgrade constants
   uint256 public constant CHUNK_SIZE = 3 days;
   uint256 public constant PROPOSE_SUBCHUNK_SIZE = 1 days;
@@ -85,9 +87,6 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
   // Address of the previous version of BetokenFund.
   address payable public previousVersion;
 
-  // Address of the single-collateral DAI (SAI)
-  address public saiAddr;
-
   // The number of the current investment cycle.
   uint256 public cycleNumber;
 
@@ -108,6 +107,8 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
 
   // Stores the lengths of each cycle phase in seconds.
   uint256[2] public phaseLengths;
+
+  uint256 public managersOnboardedThisCycle;
 
   // The last cycle where a user redeemed all of their remaining commission.
   mapping(address => uint256) internal _lastCommissionRedemption;

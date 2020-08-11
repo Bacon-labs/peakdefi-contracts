@@ -4,7 +4,7 @@ const BigNumber = require('bignumber.js')
 async function main () {
   const config = require('../deployment_configs/rinkeby.json')
   const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
-  const accounts = await env.web3.eth.getAccounts();
+  const accounts = await env.web3.eth.getAccounts()
   const bnToString = (bn) => BigNumber(bn).toFixed(0)
 
   const BetokenFactory = env.artifacts.require('BetokenFactory')
@@ -40,12 +40,15 @@ async function main () {
   // deploy mock PEAK token
   const peakToken = await TestToken.new('Market Peak (test)', 'PEAK-test', 8)
   await peakToken.mint(accounts[0], bnToString(1e9 * 1e8)) // 1 billion PEAK
+  console.log(`Deployed PeakToken at ${peakToken.address}`)
 
   // deploy PeakStaking, PeakReward
   const peakStaking = await PeakStaking.new(peakToken.address)
   const peakReward = await PeakReward.new(config.MARKETPEAK_WALLET_ADDR, peakStaking.address)
   await peakStaking.init(peakReward.address)
   await peakReward.addSigner(peakStaking.address)
+  console.log(`Deployed PeakStaking at ${peakStaking.address}`)
+  console.log(`Deployed PeakReward at ${peakReward.address}`)
 
   // give PEAK minter rights to PeakStaking
   await peakToken.addMinter(peakStaking.address)

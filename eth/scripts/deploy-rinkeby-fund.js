@@ -23,6 +23,7 @@ async function main () {
   await betokenFactory.initFund1(betokenFund.address, 'Kairo', 'KRO', 'Betoken Shares', 'BTKS')
   await betokenFactory.initFund2(betokenFund.address, config.KYBER_TOKENS, config.COMPOUND_CTOKENS)
   await betokenFactory.initFund3(betokenFund.address, config.DEVELOPER_ACCOUNT, config.devFundingRate, config.phaseLengths, config.COMPOUND_FACTORY_ADDR)
+  await betokenFund.nextPhase()
 
   console.log(`Deployed BetokenFund at ${betokenFundAddr}`)
   console.log(`Deployed BetokenProxy at ${await betokenFund.proxyAddr()}`)

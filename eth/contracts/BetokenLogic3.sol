@@ -57,6 +57,9 @@ contract BetokenLogic3 is BetokenStorage, Utils(address(0), address(0), address(
 
         // Update total funds at management phase's beginning
         totalFundsAtManagePhaseStart = totalFundsInDAI;
+
+        // reset number of managers onboarded
+        managersOnboardedThisCycle = 0;
       } else if (cyclePhase == CyclePhase.Manage) {
         // Burn any Kairo left in BetokenFund's account
         require(cToken.destroyTokens(address(this), cToken.balanceOf(address(this))));
@@ -369,7 +372,7 @@ contract BetokenLogic3 is BetokenStorage, Utils(address(0), address(0), address(
   function peakReferralRedeemCommission()
     public
     during(CyclePhase.Intermission)
-    nonReentrant
+    
   {
     uint256 commission = __peakReferralRedeemCommission();
 
@@ -391,7 +394,7 @@ contract BetokenLogic3 is BetokenStorage, Utils(address(0), address(0), address(
   function peakReferralRedeemCommissionForCycle(uint256 _cycle)
     public
     during(CyclePhase.Intermission)
-    nonReentrant
+    
   {
     require(_cycle < cycleNumber);
 
