@@ -25,7 +25,7 @@ module.exports = {
     },
     rinkeby: {
       url: 'https://rinkeby.infura.io/v3/2f4ac5ce683c4da09f88b2b564d44199',
-      gasPrice: 1e9,
+      gasPrice: 2e9,
       gas: 'auto',
       from: secret.account,
       accounts: {

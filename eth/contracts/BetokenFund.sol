@@ -30,7 +30,7 @@ contract BetokenFund is
      * Meta functions
      */
 
-    function init(
+    function initParams(
         address payable _devFundingAccount,
         uint256[2] calldata _phaseLengths,
         uint256 _devFundingRate,
@@ -65,6 +65,8 @@ contract BetokenFund is
 
         dai = ERC20Detailed(_daiAddr);
         kyber = KyberNetwork(_kyberAddr);
+
+        __initReentrancyGuard();
     }
 
     function initOwner() external {
@@ -126,106 +128,12 @@ contract BetokenFund is
      */
     function developerInitiateUpgrade(address payable _candidate)
         public
-        nonReentrant
         returns (bool _success)
     {
         (bool success, bytes memory result) = betokenLogic3.delegatecall(
             abi.encodeWithSelector(
                 this.developerInitiateUpgrade.selector,
                 _candidate
-            )
-        );
-        if (!success) {
-            return false;
-        }
-        return abi.decode(result, (bool));
-    }
-
-    /**
-     * @notice Allows a manager to signal their support of initiating an upgrade. They can change their signal before the end of the Intermission phase.
-     *          Managers who oppose initiating an upgrade don't need to call this function, unless they origianlly signalled in support.
-     *          Signals are reset every cycle.
-     * @param _inSupport True if the manager supports initiating upgrade, false if the manager opposes it.
-     * @return True if successfully changed signal, false if no changes were made.
-     */
-    function signalUpgrade(bool _inSupport)
-        public
-        nonReentrant
-        returns (bool _success)
-    {
-        (bool success, bytes memory result) = betokenLogic3.delegatecall(
-            abi.encodeWithSelector(this.signalUpgrade.selector, _inSupport)
-        );
-        if (!success) {
-            return false;
-        }
-        return abi.decode(result, (bool));
-    }
-
-    /**
-     * @notice Allows manager to propose a candidate smart contract for the fund to upgrade to. Among the managers who have proposed a candidate,
-     *          the manager with the most voting weight's candidate will be used in the vote. Ties are broken in favor of the larger address.
-     *          The proposer may change the candidate they support during the Propose subchunk in their chunk.
-     * @param _chunkNumber the chunk for which the sender is proposing the candidate
-     * @param _candidate the address of the candidate smart contract
-     * @return True if successfully proposed/changed candidate, false otherwise.
-     */
-    function proposeCandidate(uint256 _chunkNumber, address payable _candidate)
-        public
-        nonReentrant
-        returns (bool _success)
-    {
-        (bool success, bytes memory result) = betokenLogic3.delegatecall(
-            abi.encodeWithSelector(
-                this.proposeCandidate.selector,
-                _chunkNumber,
-                _candidate
-            )
-        );
-        if (!success) {
-            return false;
-        }
-        return abi.decode(result, (bool));
-    }
-
-    /**
-     * @notice Allows a manager to vote for or against a candidate smart contract the fund will upgrade to. The manager may change their vote during
-     *          the Vote subchunk. A manager who has been a proposer may not vote.
-     * @param _inSupport True if the manager supports initiating upgrade, false if the manager opposes it.
-     * @return True if successfully changed vote, false otherwise.
-     */
-    function voteOnCandidate(uint256 _chunkNumber, bool _inSupport)
-        public
-        nonReentrant
-        returns (bool _success)
-    {
-        (bool success, bytes memory result) = betokenLogic3.delegatecall(
-            abi.encodeWithSelector(
-                this.voteOnCandidate.selector,
-                _chunkNumber,
-                _inSupport
-            )
-        );
-        if (!success) {
-            return false;
-        }
-        return abi.decode(result, (bool));
-    }
-
-    /**
-     * @notice Performs the necessary state changes after a successful vote
-     * @param _chunkNumber the chunk number of the successful vote
-     * @return True if successful, false otherwise
-     */
-    function finalizeSuccessfulVote(uint256 _chunkNumber)
-        public
-        nonReentrant
-        returns (bool _success)
-    {
-        (bool success, bytes memory result) = betokenLogic3.delegatecall(
-            abi.encodeWithSelector(
-                this.finalizeSuccessfulVote.selector,
-                _chunkNumber
             )
         );
         if (!success) {
@@ -393,7 +301,7 @@ contract BetokenFund is
     /**
      * @notice Moves the fund to the next phase in the investment cycle.
      */
-    function nextPhase() public nonReentrant {
+    function nextPhase() public {
         (bool success, ) = betokenLogic3.delegatecall(
             abi.encodeWithSelector(this.nextPhase.selector)
         );
@@ -411,7 +319,7 @@ contract BetokenFund is
      *         There's a max Kairo amount that can be bought, and excess payment will be sent back to sender.
      * @param _donationInDAI the amount of DAI to be used for registration
      */
-    function registerWithDAI(uint256 _donationInDAI) public nonReentrant {
+    function registerWithDAI(uint256 _donationInDAI) public {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(
                 this.registerWithDAI.selector,
@@ -427,7 +335,7 @@ contract BetokenFund is
      * @notice Registers `msg.sender` as a manager, using ETH as payment. The more one pays, the more Kairo one gets.
      *         There's a max Kairo amount that can be bought, and excess payment will be sent back to sender.
      */
-    function registerWithETH() public payable nonReentrant {
+    function registerWithETH() public payable {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(this.registerWithETH.selector)
         );
@@ -444,7 +352,6 @@ contract BetokenFund is
      */
     function registerWithToken(address _token, uint256 _donationInTokens)
         public
-        nonReentrant
     {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(
@@ -465,7 +372,7 @@ contract BetokenFund is
     /**
      * @notice Deposit Ether into the fund. Ether will be converted into DAI.
      */
-    function depositEther(address _referrer) public payable nonReentrant {
+    function depositEther(address _referrer) public payable {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(this.depositEther.selector, _referrer)
         );
@@ -480,7 +387,6 @@ contract BetokenFund is
      */
     function depositDAI(uint256 _daiAmount, address _referrer)
         public
-        nonReentrant
     {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(
@@ -503,7 +409,7 @@ contract BetokenFund is
         address _tokenAddr,
         uint256 _tokenAmount,
         address _referrer
-    ) public nonReentrant {
+    ) public {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(
                 this.depositToken.selector,
@@ -521,7 +427,7 @@ contract BetokenFund is
      * @notice Withdraws Ether by burning Shares.
      * @param _amountInDAI Amount of funds to be withdrawn expressed in DAI. Fixed-point decimal. May be different from actual amount.
      */
-    function withdrawEther(uint256 _amountInDAI) public nonReentrant {
+    function withdrawEther(uint256 _amountInDAI) public {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(this.withdrawEther.selector, _amountInDAI)
         );
@@ -534,7 +440,7 @@ contract BetokenFund is
      * @notice Withdraws Ether by burning Shares.
      * @param _amountInDAI Amount of funds to be withdrawn expressed in DAI. Fixed-point decimal. May be different from actual amount.
      */
-    function withdrawDAI(uint256 _amountInDAI) public nonReentrant {
+    function withdrawDAI(uint256 _amountInDAI) public {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(this.withdrawDAI.selector, _amountInDAI)
         );
@@ -550,7 +456,6 @@ contract BetokenFund is
      */
     function withdrawToken(address _tokenAddr, uint256 _amountInDAI)
         public
-        nonReentrant
     {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(
@@ -567,7 +472,7 @@ contract BetokenFund is
     /**
      * @notice Redeems commission.
      */
-    function redeemCommission(bool _inShares) public nonReentrant {
+    function redeemCommission(bool _inShares) public {
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(this.redeemCommission.selector, _inShares)
         );
@@ -584,7 +489,6 @@ contract BetokenFund is
      */
     function redeemCommissionForCycle(bool _inShares, uint256 _cycle)
         public
-        nonReentrant
     {
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(
@@ -602,7 +506,7 @@ contract BetokenFund is
      * @notice Sells tokens left over due to manager not selling or KyberNetwork not having enough volume. Callable by anyone. Money goes to developer.
      * @param _tokenAddr address of the token to be sold
      */
-    function sellLeftoverToken(address _tokenAddr) public nonReentrant {
+    function sellLeftoverToken(address _tokenAddr) public {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(this.sellLeftoverToken.selector, _tokenAddr)
         );
@@ -617,7 +521,6 @@ contract BetokenFund is
      */
     function sellLeftoverCompoundOrder(address payable _orderAddress)
         public
-        nonReentrant
     {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(
@@ -634,7 +537,7 @@ contract BetokenFund is
      * @notice Burns the Kairo balance of a manager who has been inactive for a certain number of cycles
      * @param _deadman the manager whose Kairo balance will be burned
      */
-    function burnDeadman(address _deadman) public nonReentrant {
+    function burnDeadman(address _deadman) public {
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(this.burnDeadman.selector, _deadman)
         );
@@ -659,7 +562,7 @@ contract BetokenFund is
         uint256 _stake,
         uint256 _minPrice,
         uint256 _maxPrice
-    ) public nonReentrant {
+    ) public {
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(
                 this.createInvestment.selector,
@@ -690,7 +593,7 @@ contract BetokenFund is
         uint256 _maxPrice,
         bytes memory _calldata,
         bool _useKyber
-    ) public nonReentrant {
+    ) public {
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(
                 this.createInvestmentV2.selector,
@@ -722,7 +625,7 @@ contract BetokenFund is
         uint256 _tokenAmount,
         uint256 _minPrice,
         uint256 _maxPrice
-    ) public nonReentrant {
+    ) public {
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(
                 this.sellInvestmentAsset.selector,
@@ -754,7 +657,7 @@ contract BetokenFund is
         uint256 _maxPrice,
         bytes memory _calldata,
         bool _useKyber
-    ) public nonReentrant {
+    ) public {
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(
                 this.sellInvestmentAssetV2.selector,
@@ -785,7 +688,7 @@ contract BetokenFund is
         uint256 _stake,
         uint256 _minPrice,
         uint256 _maxPrice
-    ) public nonReentrant {
+    ) public {
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(
                 this.createCompoundOrder.selector,
@@ -811,7 +714,7 @@ contract BetokenFund is
         uint256 _orderId,
         uint256 _minPrice,
         uint256 _maxPrice
-    ) public nonReentrant {
+    ) public {
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(
                 this.sellCompoundOrder.selector,
@@ -832,7 +735,6 @@ contract BetokenFund is
      */
     function repayCompoundOrder(uint256 _orderId, uint256 _repayAmountInDAI)
         public
-        nonReentrant
     {
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(
@@ -937,7 +839,7 @@ contract BetokenFund is
     /**
      * @notice Redeems commission.
      */
-    function peakReferralRedeemCommission() public nonReentrant {
+    function peakReferralRedeemCommission() public {
         (bool success, ) = betokenLogic3.delegatecall(
             abi.encodeWithSelector(this.peakReferralRedeemCommission.selector)
         );
@@ -953,7 +855,6 @@ contract BetokenFund is
      */
     function peakReferralRedeemCommissionForCycle(uint256 _cycle)
         public
-        nonReentrant
     {
         (bool success, ) = betokenLogic3.delegatecall(
             abi.encodeWithSelector(

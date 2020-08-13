@@ -12,6 +12,7 @@ BetokenLogic2 = artifacts.require "BetokenLogic2"
 BetokenLogic3 = artifacts.require "BetokenLogic3"
 PeakReward = artifacts.require "PeakReward"
 PeakStaking = artifacts.require "PeakStaking"
+BetokenFactory = artifacts.require "BetokenFactory"
 
 BigNumber = require "bignumber.js"
 
@@ -104,12 +105,6 @@ module.exports = () ->
   # deploy Kairo and Betoken Shares contracts
   MiniMeTokenFactory.setAsDeployed(await MiniMeTokenFactory.new())
   minimeFactory = await MiniMeTokenFactory.deployed()
-  controlTokenAddr = (await minimeFactory.createCloneToken(
-      ZERO_ADDR, 0, "Kairo", 18, "KRO", false)).logs[0].args.addr
-  shareTokenAddr = (await minimeFactory.createCloneToken(
-      ZERO_ADDR, 0, "Betoken Shares", 18, "BTKS", true)).logs[0].args.addr
-  ControlToken = await MiniMeToken.at(controlTokenAddr)
-  ShareToken = await MiniMeToken.at(shareTokenAddr)
   
   # deploy ShortCERC20Order
   ShortCERC20OrderContract = await ShortCERC20Order.new()
@@ -169,50 +164,33 @@ module.exports = () ->
   await PeakStakingContract.init(PeakRewardContract.address)
   await PeakRewardContract.addSigner(PeakStakingContract.address)
 
-  # deploy BetokenFund contract
-  compoundTokensArray = (compoundTokens[token] for token in tokenAddrs[0..tokenAddrs.length - 3])
-  compoundTokensArray.push(TestCEtherContract.address)
-  BetokenFund.setAsDeployed(await BetokenFund.new())
-  betokenFund = await BetokenFund.deployed()
-  await betokenFund.initOwner()
-  await betokenFund.initInternalTokens(
-    ControlToken.address,
-    ShareToken.address,
-    PeakReferralToken.address
-  )
-  await betokenFund.init(
-    accounts[0], #devFundingAccount
-    config.phaseLengths,
-    bnToString(config.devFundingRate),
-    ZERO_ADDR,
+  # deploy BetokenFund template
+  fundTemplate = await BetokenFund.new()
+
+  # deploy BetokenFactory
+  betokenFactory = await BetokenFactory.new(
     TestDAI.address,
     TestKyberNetworkContract.address,
-    CompoundOrderFactoryContract.address,
+    ZERO_ADDR,
+    fundTemplate.address,
     BetokenLogicContract.address,
     BetokenLogic2Contract.address,
     BetokenLogic3Contract.address,
-    1,
-    ZERO_ADDR,
-    PeakRewardContract.address
-  )
-  await betokenFund.initTokenListings(
-    tokenAddrs[0..tokenAddrs.length - 3].concat([ETH_ADDR]),
-    compoundTokensArray
+    PeakRewardContract.address,
+    minimeFactory.address
   )
 
-  # deploy BetokenProxy contract
-  BetokenProxyContract = await BetokenProxy.new(
-    betokenFund.address
-  )
-  BetokenProxy.setAsDeployed(BetokenProxyContract)
+  await PeakRewardContract.addSigner(betokenFactory.address)
 
-  # set proxy address in BetokenFund
-  await betokenFund.setProxy(BetokenProxyContract.address)
-
-  await ControlToken.transferOwnership(betokenFund.address)
-  await ShareToken.transferOwnership(betokenFund.address)
-
-  await PeakReferralToken.transferOwnership(betokenFund.address)
-  await PeakRewardContract.addSigner(betokenFund.address)
-
+  # deploy BetokenFund
+  compoundTokensArray = (compoundTokens[token] for token in tokenAddrs[0..tokenAddrs.length - 3])
+  compoundTokensArray.push(TestCEtherContract.address)
+  betokenFundAddr = await betokenFactory.createFund.call()
+  await betokenFactory.createFund()
+  betokenFund = await BetokenFund.at(betokenFundAddr)
+  await betokenFactory.initFund1(betokenFund.address, 'Kairo', 'KRO', 'Betoken Shares', 'BTKS')
+  await betokenFactory.initFund2(betokenFund.address, tokenAddrs[0..tokenAddrs.length - 3].concat([ETH_ADDR]), compoundTokensArray)
+  await betokenFactory.initFund3(betokenFund.address, accounts[0], config.devFundingRate, config.phaseLengths, CompoundOrderFactoryContract.address)
   await betokenFund.nextPhase()
+
+  BetokenFund.setAsDeployed(betokenFund)

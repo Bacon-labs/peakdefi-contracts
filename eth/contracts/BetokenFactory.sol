@@ -93,7 +93,7 @@ contract BetokenFactory is CloneFactory {
         uint256[2] calldata _phaseLengths,
         address _compoundFactoryAddr
     ) external {
-        fund.init(
+        fund.initParams(
             _devFundingAccount,
             _phaseLengths,
             _devFundingRate,

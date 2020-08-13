@@ -22,7 +22,6 @@ async function main () {
 
   const PeakStaking = env.artifacts.require('PeakStaking')
   const PeakReward = env.artifacts.require('PeakReward')
-  const PeakToken = env.artifacts.require('PeakToken')
 
   const TestToken = env.artifacts.require('TestToken')
 
