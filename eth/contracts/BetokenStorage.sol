@@ -37,9 +37,6 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
     uint256 public constant PEAK_COMMISSION_RATE = 20 * (10**16); // The proportion of profits that gets distributed to PeakDeFi referrers every cycle.
     uint256 public constant ASSET_FEE_RATE = 1 * (10**15); // The proportion of fund balance that gets distributed to Kairo holders every cycle.
     uint256 public constant NEXT_PHASE_REWARD = 1 * (10**18); // Amount of Kairo rewarded to the user who calls nextPhase().
-    uint256 public constant MAX_BUY_KRO_PROP = 1 * (10**16); // max Kairo you can buy is 1% of total supply
-    uint256 public constant FALLBACK_MAX_DONATION = 100 * (10**18); // If payment cap for registration is below 100 DAI, use 100 DAI instead
-    uint256 public constant MIN_KRO_PRICE = 25 * (10**17); // 1 KRO >= 2.5 DAI
     uint256 public constant COLLATERAL_RATIO_MODIFIER = 75 * (10**16); // Modifies Compound's collateral ratio, gets 2:1 from 1.5:1 ratio
     uint256 public constant MIN_RISK_TIME = 3 days; // Mininum risk taken to get full commissions is 9 days * kairoBalance
     uint256 public constant INACTIVE_THRESHOLD = 2; // Number of inactive cycles after which a manager's Kairo balance can be burned
@@ -47,14 +44,6 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
     uint256 public constant ROI_BURN_THRESHOLD = 25 * (10**16); // ROI worse than 25% will see their stake all burned
     uint256 public constant ROI_PUNISH_SLOPE = 6; // kroROI = -(6 * absROI - 0.5)
     uint256 public constant ROI_PUNISH_NEG_BIAS = 5 * (10**17); // kroROI = -(6 * absROI - 0.5)
-    uint256 public constant NEW_MANAGER_KAIRO = 100 * (10**18);
-    uint256 public constant MAX_NEW_MANAGERS = 25;
-    // Upgrade constants
-    uint256 public constant CHUNK_SIZE = 3 days;
-    uint256 public constant PROPOSE_SUBCHUNK_SIZE = 1 days;
-    uint256 public constant CYCLES_TILL_MATURITY = 3;
-    uint256 public constant QUORUM = 10 * (10**16); // 10% quorum
-    uint256 public constant VOTE_SUCCESS_THRESHOLD = 75 * (10**16); // Votes on upgrade candidates need >75% voting weight to pass
 
     // Instance variables
 
@@ -108,7 +97,17 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
     // Stores the lengths of each cycle phase in seconds.
     uint256[2] public phaseLengths;
 
+    // The number of managers onboarded during the current cycle
     uint256 public managersOnboardedThisCycle;
+
+    // The amount of Kairo tokens a new manager receves
+    uint256 public newManagerKairo;
+
+    // The max number of new managers that can be onboarded in one cycle
+    uint256 public maxNewManagersPerCycle;
+
+    // The price of Kairo in DAI
+    uint256 public kairoPrice;
 
     // The last cycle where a user redeemed all of their remaining commission.
     mapping(address => uint256) internal _lastCommissionRedemption;
@@ -278,25 +277,6 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
     /*
   Helper functions shared by both BetokenLogic & BetokenFund
   */
-
-    /**
-     * @notice Calculates the current price of Kairo. The price is equal to the amount of DAI each Kairo
-     *         can control, and it's kept above MIN_KRO_PRICE.
-     * @return Kairo's current price
-     */
-    function kairoPrice() public view returns (uint256 _kairoPrice) {
-        if (cToken.totalSupply() == 0) {
-            return MIN_KRO_PRICE;
-        }
-        uint256 controlPerKairo = totalFundsInDAI.mul(10**18).div(
-            cToken.totalSupply()
-        );
-        if (controlPerKairo < MIN_KRO_PRICE) {
-            // keep price above minimum price
-            return MIN_KRO_PRICE;
-        }
-        return controlPerKairo;
-    }
 
     function lastCommissionRedemption(address _manager)
         public

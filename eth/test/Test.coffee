@@ -35,6 +35,9 @@ DAI_PRICE = PRECISION
 PHASE_LENGTHS = (require "../deployment_configs/testnet.json").phaseLengths
 DAY = 86400
 INACTIVE_THRESHOLD = 2
+NEW_MANAGER_KAIRO = 100 * PRECISION
+MAX_NEW_MANAGERS_PER_CYCLE = 25
+KAIRO_PRICE = 10 * PRECISION
 
 # travel `time` seconds forward in time
 timeTravel = (time) ->
@@ -282,7 +285,7 @@ contract("simulation", (accounts) ->
     account2 = accounts[2]
     account3 = accounts[3]
 
-    amount = 10 * PRECISION
+    amount = NEW_MANAGER_KAIRO
 
     # register account[1] using ETH
     await this.fund.registerWithETH({from: account, value: await calcRegisterPayAmount(this.fund, amount, ETH_PRICE)})
@@ -293,7 +296,7 @@ contract("simulation", (accounts) ->
 
     # register account[2]
     await dai.approve(this.fund.address, daiAmount, {from: account2})
-    await this.fund.registerWithDAI(daiAmount, {from: account2})
+    await this.fund.registerWithDAI({from: account2})
 
     # mint OMG tokens for account[3]
     omgAmount = bnToString(await calcRegisterPayAmount(this.fund, amount, OMG_PRICE))
@@ -337,7 +340,7 @@ contract("simulation", (accounts) ->
     prevFundTokenBlnce = BigNumber await token.balanceOf(this.fund.address)
 
     # buy token
-    amount = 10 * PRECISION
+    amount = NEW_MANAGER_KAIRO
     await this.fund.createInvestment(token.address, bnToString(amount), 0, MAX_PRICE, {from: account})
 
     # check KRO balance
@@ -512,6 +515,7 @@ contract("simulation", (accounts) ->
 
     # check penalty
     # only invested full kro balance for 3 days out of 9, so penalty / commission = 2
+    console.log(commissionAmount._penalty.toString(), commissionAmount._commission.toString());
     assert(epsilon_equal(BigNumber(commissionAmount._penalty).div(commissionAmount._commission), 2), "penalty amount incorrect")
   )
 
@@ -576,7 +580,7 @@ contract("price_changes", (accounts) ->
     await dai.approve(this.fund.address, bnToString(amount), {from: account}) # Approve transfer
     await this.fund.depositDAI(bnToString(amount), ZERO_ADDR, {from: account}) # Deposit for account
 
-    kroAmount = 10 * PRECISION
+    kroAmount = KAIRO_PRICE
     await this.fund.registerWithETH({from: account, value: await calcRegisterPayAmount(this.fund, kroAmount, ETH_PRICE)})
 
     await timeTravel(PHASE_LENGTHS[0])

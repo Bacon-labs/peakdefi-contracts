@@ -251,46 +251,20 @@ contract BetokenLogic2 is
      */
 
     /**
-     * @notice Calculates the max amount a new manager can pay for an account. Equivalent to 1% of Kairo total supply.
-     *         If less than 100 DAI, returns 100 DAI.
-     * @return the max DAI amount for purchasing a manager account
-     */
-    function maxRegistrationPaymentInDAI()
-        public
-        view
-        returns (uint256 _maxDonationInDAI)
-    {
-        uint256 kroPrice = kairoPrice();
-        _maxDonationInDAI = MAX_BUY_KRO_PROP
-            .mul(cToken.totalSupply())
-            .div(PRECISION)
-            .mul(kroPrice)
-            .div(PRECISION);
-        if (_maxDonationInDAI < FALLBACK_MAX_DONATION) {
-            _maxDonationInDAI = FALLBACK_MAX_DONATION;
-        }
-    }
-
-    /**
      * @notice Registers `msg.sender` as a manager, using DAI as payment. The more one pays, the more Kairo one gets.
      *         There's a max Kairo amount that can be bought, and excess payment will be sent back to sender.
-     * @param _donationInDAI the amount of DAI to be used for registration
      */
-    function registerWithDAI(uint256 _donationInDAI)
+    function registerWithDAI()
         public
         during(CyclePhase.Intermission)
         nonReentrant
     {
-        dai.safeTransferFrom(msg.sender, address(this), _donationInDAI);
+        require(managersOnboardedThisCycle < maxNewManagersPerCycle);
+        managersOnboardedThisCycle = managersOnboardedThisCycle.add(1);
 
-        // if DAI value is greater than maximum allowed, return excess DAI to msg.sender
-        uint256 maxDonationInDAI = maxRegistrationPaymentInDAI();
-        if (_donationInDAI > maxDonationInDAI) {
-            dai.safeTransfer(msg.sender, _donationInDAI.sub(maxDonationInDAI));
-            _donationInDAI = maxDonationInDAI;
-        }
-
-        __register(_donationInDAI);
+        uint256 donationInDAI = newManagerKairo.mul(kairoPrice).div(PRECISION);
+        dai.safeTransferFrom(msg.sender, address(this), donationInDAI);
+        __register(donationInDAI);
     }
 
     /**
@@ -303,16 +277,19 @@ contract BetokenLogic2 is
         during(CyclePhase.Intermission)
         nonReentrant
     {
+        require(managersOnboardedThisCycle < maxNewManagersPerCycle);
+        managersOnboardedThisCycle = managersOnboardedThisCycle.add(1);
+
         uint256 receivedDAI;
 
         // trade ETH for DAI
         (, , receivedDAI, ) = __kyberTrade(ETH_TOKEN_ADDRESS, msg.value, dai);
 
-        // if DAI value is greater than maximum allowed, return excess DAI to msg.sender
-        uint256 maxDonationInDAI = maxRegistrationPaymentInDAI();
-        if (receivedDAI > maxDonationInDAI) {
-            dai.safeTransfer(msg.sender, receivedDAI.sub(maxDonationInDAI));
-            receivedDAI = maxDonationInDAI;
+        // if DAI value is greater than the amount required, return excess DAI to msg.sender
+        uint256 donationInDAI = newManagerKairo.mul(kairoPrice).div(PRECISION);
+        if (receivedDAI > donationInDAI) {
+            dai.safeTransfer(msg.sender, receivedDAI.sub(donationInDAI));
+            receivedDAI = donationInDAI;
         }
 
         // register new manager
@@ -330,6 +307,8 @@ contract BetokenLogic2 is
         during(CyclePhase.Intermission)
         nonReentrant
     {
+        require(managersOnboardedThisCycle < maxNewManagersPerCycle);
+        managersOnboardedThisCycle = managersOnboardedThisCycle.add(1);
         require(
             _token != address(0) &&
                 _token != address(ETH_TOKEN_ADDRESS) &&
@@ -344,11 +323,11 @@ contract BetokenLogic2 is
 
         (, , receivedDAI, ) = __kyberTrade(token, _donationInTokens, dai);
 
-        // if DAI value is greater than maximum allowed, return excess DAI to msg.sender
-        uint256 maxDonationInDAI = maxRegistrationPaymentInDAI();
-        if (receivedDAI > maxDonationInDAI) {
-            dai.safeTransfer(msg.sender, receivedDAI.sub(maxDonationInDAI));
-            receivedDAI = maxDonationInDAI;
+        // if DAI value is greater than the amount required, return excess DAI to msg.sender
+        uint256 donationInDAI = newManagerKairo.mul(kairoPrice).div(PRECISION);
+        if (receivedDAI > donationInDAI) {
+            dai.safeTransfer(msg.sender, receivedDAI.sub(donationInDAI));
+            receivedDAI = donationInDAI;
         }
 
         // register new manager
@@ -411,7 +390,7 @@ contract BetokenLogic2 is
         ); // each address can only join once
 
         // mint KRO for msg.sender
-        uint256 kroAmount = _donationInDAI.mul(PRECISION).div(kairoPrice());
+        uint256 kroAmount = _donationInDAI.mul(PRECISION).div(kairoPrice);
         require(cToken.generateTokens(msg.sender, kroAmount));
 
         // Set risk fallback base stake

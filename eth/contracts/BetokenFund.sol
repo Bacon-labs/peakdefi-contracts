@@ -80,11 +80,23 @@ contract BetokenFund is
         address payable _peakReferralTokenAddr
     ) external onlyOwner {
         require(controlTokenAddr == address(0));
+        require(_kroAddr != address(0));
         controlTokenAddr = _kroAddr;
         shareTokenAddr = _sTokenAddr;
         cToken = IMiniMeToken(_kroAddr);
         sToken = IMiniMeToken(_sTokenAddr);
         peakReferralToken = IMiniMeToken(_peakReferralTokenAddr);
+    }
+
+    function initRegistration(
+        uint256 _newManagerKairo,
+        uint256 _maxNewManagersPerCycle,
+        uint256 _kairoPrice
+    ) external onlyOwner {
+        require(_newManagerKairo > 0 && newManagerKairo == 0);
+        newManagerKairo = _newManagerKairo;
+        maxNewManagersPerCycle = _maxNewManagersPerCycle;
+        kairoPrice = _kairoPrice;
     }
 
     function initTokenListings(
@@ -317,13 +329,11 @@ contract BetokenFund is
     /**
      * @notice Registers `msg.sender` as a manager, using DAI as payment. The more one pays, the more Kairo one gets.
      *         There's a max Kairo amount that can be bought, and excess payment will be sent back to sender.
-     * @param _donationInDAI the amount of DAI to be used for registration
      */
-    function registerWithDAI(uint256 _donationInDAI) public {
+    function registerWithDAI() public {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(
-                this.registerWithDAI.selector,
-                _donationInDAI
+                this.registerWithDAI.selector
             )
         );
         if (!success) {

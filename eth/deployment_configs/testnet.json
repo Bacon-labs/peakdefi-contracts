@@ -1,4 +1,10 @@
 {
-  "phaseLengths": [259200, 2332800],
-  "devFundingRate": 1000000000000000
+  "phaseLengths": [
+    259200,
+    2332800
+  ],
+  "devFundingRate": 1000000000000000,
+  "NEW_MANAGER_KAIRO": 1e20,
+  "MAX_NEW_MANAGERS_PER_CYCLE": 25,
+  "KAIRO_PRICE": 1e19
 }

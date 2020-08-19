@@ -22,7 +22,7 @@ contract BetokenFactory is CloneFactory {
     address public peakRewardAddr;
     MiniMeTokenFactory public minimeFactory;
 
-    constructor (
+    constructor(
         address _daiAddr,
         address payable _kyberAddr,
         address payable _oneInchAddr,
@@ -66,16 +66,41 @@ contract BetokenFactory is CloneFactory {
         string calldata sharesSymbol
     ) external {
         // create tokens
-        MiniMeToken kairo = minimeFactory.createCloneToken(address(0), 0, kairoName, 18, kairoSymbol, false);
-        MiniMeToken shares = minimeFactory.createCloneToken(address(0), 0, sharesName, 18, sharesSymbol, true);
-        MiniMeToken peakReferralToken = minimeFactory.createCloneToken(address(0), 0, "Peak Referral Token", 18, "PRT", false);
+        MiniMeToken kairo = minimeFactory.createCloneToken(
+            address(0),
+            0,
+            kairoName,
+            18,
+            kairoSymbol,
+            false
+        );
+        MiniMeToken shares = minimeFactory.createCloneToken(
+            address(0),
+            0,
+            sharesName,
+            18,
+            sharesSymbol,
+            true
+        );
+        MiniMeToken peakReferralToken = minimeFactory.createCloneToken(
+            address(0),
+            0,
+            "Peak Referral Token",
+            18,
+            "PRT",
+            false
+        );
 
         // transfer token ownerships to fund
         kairo.transferOwnership(address(fund));
         shares.transferOwnership(address(fund));
         peakReferralToken.transferOwnership(address(fund));
 
-        fund.initInternalTokens(address(kairo), address(shares), address(peakReferralToken));
+        fund.initInternalTokens(
+            address(kairo),
+            address(shares),
+            address(peakReferralToken)
+        );
     }
 
     function initFund2(
@@ -87,6 +112,19 @@ contract BetokenFactory is CloneFactory {
     }
 
     function initFund3(
+        BetokenFund fund,
+        uint256 _newManagerKairo,
+        uint256 _maxNewManagersPerCycle,
+        uint256 _kairoPrice
+    ) external {
+        fund.initRegistration(
+            _newManagerKairo,
+            _maxNewManagersPerCycle,
+            _kairoPrice
+        );
+    }
+
+    function initFund4(
         BetokenFund fund,
         address payable _devFundingAccount,
         uint256 _devFundingRate,
