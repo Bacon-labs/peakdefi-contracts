@@ -6,14 +6,19 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/access/roles/SignerRole.sol";
 import "../staking/PeakStaking.sol";
 
-
 contract PeakReward is SignerRole {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
     event Register(address user, address referrer);
     event RankChange(address user, uint256 oldRank, uint256 newRank);
-    event PayCommission(address referrer, address receipient, address token, uint256 amount, uint8 level);
+    event PayCommission(
+        address referrer,
+        address receipient,
+        address token,
+        uint256 amount,
+        uint8 level
+    );
     event ChangedCareerValue(address user, uint256 changeAmount, bool positive);
 
     modifier regUser(address user) {
@@ -52,8 +57,15 @@ contract PeakReward is SignerRole {
 
     address public marketPeakWallet;
     PeakStaking public peakStaking;
+    address public peakToken;
+    address public stablecoin;
 
-    constructor(address _marketPeakWallet, address _peakStaking) public {
+    constructor(
+        address _marketPeakWallet,
+        address _peakStaking,
+        address _peakToken,
+        address _stablecoin
+    ) public {
         // initialize commission percentages for each level
         commissionPercentages.push(10 * (10**16)); // 10%
         commissionPercentages.push(4 * (10**16)); // 4%
@@ -89,6 +101,8 @@ contract PeakReward is SignerRole {
 
         marketPeakWallet = _marketPeakWallet;
         peakStaking = PeakStaking(_peakStaking);
+        peakToken = _peakToken;
+        stablecoin = _stablecoin;
     }
 
     /**
@@ -114,7 +128,11 @@ contract PeakReward is SignerRole {
         emit Register(user, referrer);
     }
 
-    function canRefer(address user, address referrer) public view returns (bool) {
+    function canRefer(address user, address referrer)
+        public
+        view
+        returns (bool)
+    {
         return
             !isUser[user] &&
             user != referrer &&
@@ -154,6 +172,11 @@ contract PeakReward is SignerRole {
                 }
                 token.safeTransfer(ptr, com);
                 commissionLeft = commissionLeft.sub(com);
+                if (commissionToken == peakToken) {
+                    incrementCareerValueInPeak(ptr, com);
+                } else if (commissionToken == stablecoin) {
+                    incrementCareerValueInDai(ptr, com);
+                }
                 emit PayCommission(referrer, ptr, commissionToken, com, i);
             }
 

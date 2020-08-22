@@ -436,10 +436,6 @@ contract BetokenLogic2 is
             require(
                 peakReferralToken.generateTokens(actualReferrer, shareAmount)
             );
-            peakReward.incrementCareerValueInDai(
-                actualReferrer,
-                _depositDAIAmount
-            );
         }
     }
 
@@ -467,10 +463,6 @@ contract BetokenLogic2 is
                     actualReferrer,
                     burnReferralTokenAmount
                 )
-            );
-            peakReward.decrementCareerValueInDai(
-                actualReferrer,
-                _withdrawDAIAmount
             );
         }
     }

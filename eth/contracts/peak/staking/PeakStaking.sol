@@ -117,9 +117,6 @@ contract PeakStaking {
                 .div(PRECISION);
             peakToken.mint(msg.sender, referralStakerBonus);
             emit WithdrawReward(stakeIdx, msg.sender, referralStakerBonus);
-
-            // increment referrer CV
-            peakReward.incrementCareerValueInPeak(actualReferrer, interestAmount);
         }
 
         emit CreateStake(stakeIdx, msg.sender, referrer, stakeAmount, stakeTimeInDays, interestAmount);

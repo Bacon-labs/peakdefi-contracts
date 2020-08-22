@@ -159,7 +159,7 @@ module.exports = () ->
   PeakStakingContract = await PeakStaking.new(PeakToken.address)
   PeakStaking.setAsDeployed(PeakStakingContract)
   await PeakToken.addMinter(PeakStakingContract.address)
-  PeakRewardContract = await PeakReward.new(accounts[0], PeakStakingContract.address)
+  PeakRewardContract = await PeakReward.new(accounts[0], PeakStakingContract.address, PeakToken.address, testDAIAddr)
   PeakReward.setAsDeployed(PeakRewardContract)
   await PeakStakingContract.init(PeakRewardContract.address)
   await PeakRewardContract.addSigner(PeakStakingContract.address)

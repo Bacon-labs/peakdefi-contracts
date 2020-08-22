@@ -43,7 +43,7 @@ async function main () {
 
   // deploy PeakStaking, PeakReward
   const peakStaking = await PeakStaking.new(peakToken.address)
-  const peakReward = await PeakReward.new(config.MARKETPEAK_WALLET_ADDR, peakStaking.address)
+  const peakReward = await PeakReward.new(config.MARKETPEAK_WALLET_ADDR, peakStaking.address, peakToken.address, config.DAI_ADDR)
   await peakStaking.init(peakReward.address)
   await peakReward.addSigner(peakStaking.address)
   console.log(`Deployed PeakStaking at ${peakStaking.address}`)
