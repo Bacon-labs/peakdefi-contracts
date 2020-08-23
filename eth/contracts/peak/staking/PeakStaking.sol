@@ -5,12 +5,18 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "../reward/PeakReward.sol";
 import "../PeakToken.sol";
 
-
 contract PeakStaking {
     using SafeMath for uint256;
     using SafeERC20 for PeakToken;
 
-    event CreateStake(uint256 idx, address user, address referrer, uint256 stakeAmount, uint256 stakeTimeInDays, uint256 interestAmount);
+    event CreateStake(
+        uint256 idx,
+        address user,
+        address referrer,
+        uint256 stakeAmount,
+        uint256 stakeTimeInDays,
+        uint256 interestAmount
+    );
     event WithdrawReward(uint256 idx, address user, uint256 rewardAmount);
     event WithdrawStake(uint256 idx, address user);
 
@@ -26,6 +32,7 @@ contract PeakStaking {
     uint256 internal constant DAY_IN_SECONDS = 86400;
     uint256 internal constant COMMISSION_RATE = 20 * (10**16); // 20%
     uint256 internal constant REFERRAL_STAKER_BONUS = 3 * (10**16); // 3%
+    uint256 public constant PEAK_MINT_CAP = 5 * 10**17; // 5 billion PEAK
 
     struct Stake {
         address staker;
@@ -60,8 +67,14 @@ contract PeakStaking {
         uint256 stakeTimeInDays,
         address referrer
     ) public returns (uint256 stakeIdx) {
-        require(stakeTimeInDays >= MIN_STAKE_PERIOD, "PeakStaking: stakeTimeInDays < MIN_STAKE_PERIOD");
-        require(stakeTimeInDays <= MAX_STAKE_PERIOD, "PeakStaking: stakeTimeInDays > MAX_STAKE_PERIOD");
+        require(
+            stakeTimeInDays >= MIN_STAKE_PERIOD,
+            "PeakStaking: stakeTimeInDays < MIN_STAKE_PERIOD"
+        );
+        require(
+            stakeTimeInDays <= MAX_STAKE_PERIOD,
+            "PeakStaking: stakeTimeInDays > MAX_STAKE_PERIOD"
+        );
 
         // record stake
         uint256 interestAmount = getInterestAmount(
@@ -116,30 +129,54 @@ contract PeakStaking {
                 .mul(REFERRAL_STAKER_BONUS)
                 .div(PRECISION);
             peakToken.mint(msg.sender, referralStakerBonus);
+
+            mintedPeakTokens = mintedPeakTokens.add(rawCommission.sub(leftoverAmount).add(referralStakerBonus));
+
             emit WithdrawReward(stakeIdx, msg.sender, referralStakerBonus);
         }
 
-        emit CreateStake(stakeIdx, msg.sender, referrer, stakeAmount, stakeTimeInDays, interestAmount);
+        require(mintedPeakTokens <= PEAK_MINT_CAP, "PeakStaking: reached cap");
+
+        emit CreateStake(
+            stakeIdx,
+            msg.sender,
+            referrer,
+            stakeAmount,
+            stakeTimeInDays,
+            interestAmount
+        );
     }
 
     function withdraw(uint256 stakeIdx) public {
         Stake storage stakeObj = stakeList[stakeIdx];
-        require(stakeObj.staker == msg.sender, "PeakStaking: Sender not staker");
+        require(
+            stakeObj.staker == msg.sender,
+            "PeakStaking: Sender not staker"
+        );
         require(stakeObj.active, "PeakStaking: Not active");
 
         // calculate amount that can be withdrawn
-        uint256 stakeTimeInSeconds = stakeObj.stakeTimeInDays.mul(DAY_IN_SECONDS);
+        uint256 stakeTimeInSeconds = stakeObj.stakeTimeInDays.mul(
+            DAY_IN_SECONDS
+        );
         uint256 withdrawAmount;
         if (now >= stakeObj.stakeTimestamp.add(stakeTimeInSeconds)) {
             // matured, withdraw all
-            withdrawAmount = stakeObj.stakeAmount.add(stakeObj.interestAmount).sub(stakeObj.withdrawnInterestAmount);
+            withdrawAmount = stakeObj
+                .stakeAmount
+                .add(stakeObj.interestAmount)
+                .sub(stakeObj.withdrawnInterestAmount);
             stakeObj.active = false;
             stakeObj.withdrawnInterestAmount = stakeObj.interestAmount;
             userStakeAmount[msg.sender] = userStakeAmount[msg.sender].sub(
                 stakeObj.stakeAmount
             );
 
-            emit WithdrawReward(stakeIdx, msg.sender, stakeObj.interestAmount.sub(stakeObj.withdrawnInterestAmount));
+            emit WithdrawReward(
+                stakeIdx,
+                msg.sender,
+                stakeObj.interestAmount.sub(stakeObj.withdrawnInterestAmount)
+            );
             emit WithdrawStake(stakeIdx, msg.sender);
         } else {
             // not mature, partial withdraw
@@ -150,9 +187,9 @@ contract PeakStaking {
                 .sub(stakeObj.withdrawnInterestAmount);
 
             // record withdrawal
-            stakeObj.withdrawnInterestAmount = stakeObj.withdrawnInterestAmount.add(
-                withdrawAmount
-            );
+            stakeObj.withdrawnInterestAmount = stakeObj
+                .withdrawnInterestAmount
+                .add(withdrawAmount);
 
             emit WithdrawReward(stakeIdx, msg.sender, withdrawAmount);
         }
@@ -177,9 +214,7 @@ contract PeakStaking {
         uint256 interestRate = biggerBonus.add(longerBonus).mul(irFactor).div(
             PRECISION
         );
-        uint256 interestAmount = stakeAmount
-            .mul(interestRate)
-            .div(PRECISION);
+        uint256 interestAmount = stakeAmount.mul(interestRate).div(PRECISION);
         return interestAmount;
     }
 
@@ -188,7 +223,13 @@ contract PeakStaking {
         pure
         returns (uint256)
     {
-        return DAILY_BASE_REWARD.mul(stakeTimeInDays).add(DAILY_GROWING_REWARD.mul(stakeTimeInDays).mul(stakeTimeInDays.add(1)).div(2));
+        return
+            DAILY_BASE_REWARD.mul(stakeTimeInDays).add(
+                DAILY_GROWING_REWARD
+                    .mul(stakeTimeInDays)
+                    .mul(stakeTimeInDays.add(1))
+                    .div(2)
+            );
     }
 
     function _interestRateFactor(uint256 _mintedPeakTokens)
