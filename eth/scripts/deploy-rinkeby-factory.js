@@ -24,6 +24,7 @@ async function main () {
   const PeakReward = env.artifacts.require('PeakReward')
 
   const TestToken = env.artifacts.require('TestToken')
+  const TestUniswapOracle = env.artifacts.require('TestUniswapOracle')
 
   // deploy template BetokenFund
   const betokenFundTemplate = await BetokenFund.new()
@@ -41,9 +42,12 @@ async function main () {
   await peakToken.mint(accounts[0], bnToString(1e9 * 1e8)) // 1 billion PEAK
   console.log(`Deployed PeakToken at ${peakToken.address}`)
 
+  // deploy TestUniswapOracle
+  const oracle = await TestUniswapOracle.new()
+
   // deploy PeakStaking, PeakReward
   const peakStaking = await PeakStaking.new(peakToken.address)
-  const peakReward = await PeakReward.new(config.MARKETPEAK_WALLET_ADDR, peakStaking.address, peakToken.address, config.DAI_ADDR)
+  const peakReward = await PeakReward.new(config.MARKETPEAK_WALLET_ADDR, peakStaking.address, peakToken.address, config.DAI_ADDR, oracle.address)
   await peakStaking.init(peakReward.address)
   await peakReward.addSigner(peakStaking.address)
   console.log(`Deployed PeakStaking at ${peakStaking.address}`)
@@ -62,6 +66,7 @@ async function main () {
     betokenLogic2.address,
     betokenLogic3.address,
     peakReward.address,
+    peakStaking.address,
     miniMeTokenFactory.address
   )
 

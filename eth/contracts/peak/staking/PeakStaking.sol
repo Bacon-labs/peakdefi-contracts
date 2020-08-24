@@ -130,7 +130,9 @@ contract PeakStaking {
                 .div(PRECISION);
             peakToken.mint(msg.sender, referralStakerBonus);
 
-            mintedPeakTokens = mintedPeakTokens.add(rawCommission.sub(leftoverAmount).add(referralStakerBonus));
+            mintedPeakTokens = mintedPeakTokens.add(
+                rawCommission.sub(leftoverAmount).add(referralStakerBonus)
+            );
 
             emit WithdrawReward(stakeIdx, msg.sender, referralStakerBonus);
         }
@@ -216,6 +218,18 @@ contract PeakStaking {
         );
         uint256 interestAmount = stakeAmount.mul(interestRate).div(PRECISION);
         return interestAmount;
+    }
+
+    function peakRewardMintPeakTokens(address user, uint256 mintAmount)
+        external
+    {
+        require(
+            msg.sender == address(peakReward),
+            "PeakStaking: not peakReward"
+        );
+        peakToken.mint(user, mintAmount);
+        mintedPeakTokens = mintedPeakTokens.add(mintAmount);
+        require(mintedPeakTokens <= PEAK_MINT_CAP, "PeakStaking: reached cap");
     }
 
     function _longerBonus(uint256 stakeTimeInDays)

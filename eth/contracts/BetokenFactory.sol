@@ -20,6 +20,7 @@ contract BetokenFactory is CloneFactory {
     address public betokenLogic2;
     address public betokenLogic3;
     address public peakRewardAddr;
+    address public peakStakingAddr;
     MiniMeTokenFactory public minimeFactory;
 
     constructor(
@@ -31,6 +32,7 @@ contract BetokenFactory is CloneFactory {
         address _betokenLogic2,
         address _betokenLogic3,
         address _peakRewardAddr,
+        address _peakStakingAddr,
         address _minimeFactoryAddr
     ) public {
         daiAddr = _daiAddr;
@@ -41,6 +43,7 @@ contract BetokenFactory is CloneFactory {
         betokenLogic2 = _betokenLogic2;
         betokenLogic3 = _betokenLogic3;
         peakRewardAddr = _peakRewardAddr;
+        peakStakingAddr = _peakStakingAddr;
         minimeFactory = MiniMeTokenFactory(_minimeFactoryAddr);
     }
 
@@ -115,12 +118,14 @@ contract BetokenFactory is CloneFactory {
         BetokenFund fund,
         uint256 _newManagerKairo,
         uint256 _maxNewManagersPerCycle,
-        uint256 _kairoPrice
+        uint256 _kairoPrice,
+        uint256 _peakManagerStakeRequired
     ) external {
         fund.initRegistration(
             _newManagerKairo,
             _maxNewManagersPerCycle,
-            _kairoPrice
+            _kairoPrice,
+            _peakManagerStakeRequired
         );
     }
 
@@ -144,7 +149,8 @@ contract BetokenFactory is CloneFactory {
             betokenLogic3,
             1,
             oneInchAddr,
-            peakRewardAddr
+            peakRewardAddr,
+            peakStakingAddr
         );
 
         // deploy and set BetokenProxy

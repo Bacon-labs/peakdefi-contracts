@@ -38,6 +38,7 @@ INACTIVE_THRESHOLD = 2
 NEW_MANAGER_KAIRO = 100 * PRECISION
 MAX_NEW_MANAGERS_PER_CYCLE = 25
 KAIRO_PRICE = 10 * PRECISION
+PEAK_MANAGER_STAKE_REQUIRED = 1e4 * PEAK_PRECISION
 
 # travel `time` seconds forward in time
 timeTravel = (time) ->
@@ -287,6 +288,19 @@ contract("simulation", (accounts) ->
 
     amount = NEW_MANAGER_KAIRO
 
+    # stake PEAK for accounts
+    peakStaking = await PeakStaking.deployed()
+    peakToken = await TestToken.at(await peakStaking.peakToken())
+    await peakToken.transfer(account, PEAK_MANAGER_STAKE_REQUIRED, {from: owner})
+    await peakToken.transfer(account2, PEAK_MANAGER_STAKE_REQUIRED, {from: owner})
+    await peakToken.transfer(account3, PEAK_MANAGER_STAKE_REQUIRED, {from: owner})
+    await peakToken.approve(peakStaking.address, PEAK_MANAGER_STAKE_REQUIRED, {from: account})
+    await peakToken.approve(peakStaking.address, PEAK_MANAGER_STAKE_REQUIRED, {from: account2})
+    await peakToken.approve(peakStaking.address, PEAK_MANAGER_STAKE_REQUIRED, {from: account3})
+    await peakStaking.stake(PEAK_MANAGER_STAKE_REQUIRED, 100, owner, {from: account})
+    await peakStaking.stake(PEAK_MANAGER_STAKE_REQUIRED, 100, owner, {from: account2})
+    await peakStaking.stake(PEAK_MANAGER_STAKE_REQUIRED, 100, owner, {from: account3})
+
     # register account[1] using ETH
     await this.fund.registerWithETH({from: account, value: await calcRegisterPayAmount(this.fund, amount, ETH_PRICE)})
 
@@ -515,7 +529,6 @@ contract("simulation", (accounts) ->
 
     # check penalty
     # only invested full kro balance for 3 days out of 9, so penalty / commission = 2
-    console.log(commissionAmount._penalty.toString(), commissionAmount._commission.toString());
     assert(epsilon_equal(BigNumber(commissionAmount._penalty).div(commissionAmount._commission), 2), "penalty amount incorrect")
   )
 
@@ -579,6 +592,13 @@ contract("price_changes", (accounts) ->
     await dai.mint(account, bnToString(amount), {from: owner}) # Mint DAI
     await dai.approve(this.fund.address, bnToString(amount), {from: account}) # Approve transfer
     await this.fund.depositDAI(bnToString(amount), ZERO_ADDR, {from: account}) # Deposit for account
+
+    # stake PEAK for accounts
+    peakStaking = await PeakStaking.deployed()
+    peakToken = await TestToken.at(await peakStaking.peakToken())
+    await peakToken.transfer(account, PEAK_MANAGER_STAKE_REQUIRED, {from: owner})
+    await peakToken.approve(peakStaking.address, PEAK_MANAGER_STAKE_REQUIRED, {from: account})
+    await peakStaking.stake(PEAK_MANAGER_STAKE_REQUIRED, 100, owner, {from: account})
 
     kroAmount = KAIRO_PRICE
     await this.fund.registerWithETH({from: account, value: await calcRegisterPayAmount(this.fund, kroAmount, ETH_PRICE)})
@@ -808,7 +828,7 @@ contract("param_setters", (accounts) ->
 )
 
 contract("peak_staking", (accounts) ->
-  stakeAmount = 1e6 * PEAK_PRECISION
+  stakeAmount = 1e1 * PEAK_PRECISION
   stakeTimeInDays = 100
   peakStaking = null
   peakToken = null

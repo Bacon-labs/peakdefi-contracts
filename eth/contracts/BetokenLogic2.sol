@@ -262,6 +262,9 @@ contract BetokenLogic2 is
         require(managersOnboardedThisCycle < maxNewManagersPerCycle);
         managersOnboardedThisCycle = managersOnboardedThisCycle.add(1);
 
+        uint256 peakStake = peakStaking.userStakeAmount(msg.sender);
+        require(peakStake >= peakManagerStakeRequired);
+
         uint256 donationInDAI = newManagerKairo.mul(kairoPrice).div(PRECISION);
         dai.safeTransferFrom(msg.sender, address(this), donationInDAI);
         __register(donationInDAI);
@@ -279,6 +282,9 @@ contract BetokenLogic2 is
     {
         require(managersOnboardedThisCycle < maxNewManagersPerCycle);
         managersOnboardedThisCycle = managersOnboardedThisCycle.add(1);
+
+        uint256 peakStake = peakStaking.userStakeAmount(msg.sender);
+        require(peakStake >= peakManagerStakeRequired);
 
         uint256 receivedDAI;
 
@@ -309,6 +315,10 @@ contract BetokenLogic2 is
     {
         require(managersOnboardedThisCycle < maxNewManagersPerCycle);
         managersOnboardedThisCycle = managersOnboardedThisCycle.add(1);
+
+        uint256 peakStake = peakStaking.userStakeAmount(msg.sender);
+        require(peakStake >= peakManagerStakeRequired);
+
         require(
             _token != address(0) &&
                 _token != address(ETH_TOKEN_ADDRESS) &&

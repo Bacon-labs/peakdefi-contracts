@@ -13,6 +13,7 @@ BetokenLogic3 = artifacts.require "BetokenLogic3"
 PeakReward = artifacts.require "PeakReward"
 PeakStaking = artifacts.require "PeakStaking"
 BetokenFactory = artifacts.require "BetokenFactory"
+TestUniswapOracle = artifacts.require "TestUniswapOracle"
 
 BigNumber = require "bignumber.js"
 
@@ -150,6 +151,8 @@ module.exports = () ->
   BetokenLogic3.setAsDeployed(BetokenLogic3Contract)
 
   # deploy PeakDeFi contracts
+  TestUniswapOracleContract = await TestUniswapOracle.new()
+  TestUniswapOracle.setAsDeployed(TestUniswapOracleContract)
   peakReferralTokenAddr = (await minimeFactory.createCloneToken(
       ZERO_ADDR, 0, "Peak Referral Token", 18, "PRT", true)).logs[0].args.addr
   PeakReferralToken = await MiniMeToken.at(peakReferralTokenAddr)
@@ -159,7 +162,7 @@ module.exports = () ->
   PeakStakingContract = await PeakStaking.new(PeakToken.address)
   PeakStaking.setAsDeployed(PeakStakingContract)
   await PeakToken.addMinter(PeakStakingContract.address)
-  PeakRewardContract = await PeakReward.new(accounts[0], PeakStakingContract.address, PeakToken.address, testDAIAddr)
+  PeakRewardContract = await PeakReward.new(accounts[0], PeakStakingContract.address, PeakToken.address, testDAIAddr, TestUniswapOracleContract.address)
   PeakReward.setAsDeployed(PeakRewardContract)
   await PeakStakingContract.init(PeakRewardContract.address)
   await PeakRewardContract.addSigner(PeakStakingContract.address)
@@ -177,6 +180,7 @@ module.exports = () ->
     BetokenLogic2Contract.address,
     BetokenLogic3Contract.address,
     PeakRewardContract.address,
+    PeakStakingContract.address,
     minimeFactory.address
   )
 
@@ -190,7 +194,7 @@ module.exports = () ->
   betokenFund = await BetokenFund.at(betokenFundAddr)
   await betokenFactory.initFund1(betokenFund.address, 'Kairo', 'KRO', 'Betoken Shares', 'BTKS')
   await betokenFactory.initFund2(betokenFund.address, tokenAddrs[0..tokenAddrs.length - 3].concat([ETH_ADDR]), compoundTokensArray)
-  await betokenFactory.initFund3(betokenFund.address, bnToString(config.NEW_MANAGER_KAIRO), bnToString(config.MAX_NEW_MANAGERS_PER_CYCLE), bnToString(config.KAIRO_PRICE))
+  await betokenFactory.initFund3(betokenFund.address, bnToString(config.NEW_MANAGER_KAIRO), bnToString(config.MAX_NEW_MANAGERS_PER_CYCLE), bnToString(config.KAIRO_PRICE), bnToString(config.PEAK_MANAGER_STAKE_REQUIRED))
   await betokenFactory.initFund4(betokenFund.address, accounts[0], config.devFundingRate, config.phaseLengths, CompoundOrderFactoryContract.address)
   await betokenFund.nextPhase()
 

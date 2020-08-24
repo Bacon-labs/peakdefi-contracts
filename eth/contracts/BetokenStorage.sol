@@ -8,6 +8,7 @@ import "./tokens/minime/TokenController.sol";
 import "./Utils.sol";
 import "./BetokenProxyInterface.sol";
 import "./peak/reward/PeakReward.sol";
+import "./peak/staking/PeakStaking.sol";
 
 /**
  * @title The storage layout of BetokenFund
@@ -34,7 +35,6 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
 
     // Fund parameters
     uint256 public constant COMMISSION_RATE = 15 * (10**16); // The proportion of profits that gets distributed to Kairo holders every cycle.
-    uint256 public constant PEAK_COMMISSION_RATE = 20 * (10**16); // The proportion of profits that gets distributed to PeakDeFi referrers every cycle.
     uint256 public constant ASSET_FEE_RATE = 1 * (10**15); // The proportion of fund balance that gets distributed to Kairo holders every cycle.
     uint256 public constant NEXT_PHASE_REWARD = 1 * (10**18); // Amount of Kairo rewarded to the user who calls nextPhase().
     uint256 public constant COLLATERAL_RATIO_MODIFIER = 75 * (10**16); // Modifies Compound's collateral ratio, gets 2:1 from 1.5:1 ratio
@@ -44,6 +44,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
     uint256 public constant ROI_BURN_THRESHOLD = 25 * (10**16); // ROI worse than 25% will see their stake all burned
     uint256 public constant ROI_PUNISH_SLOPE = 6; // kroROI = -(6 * absROI - 0.5)
     uint256 public constant ROI_PUNISH_NEG_BIAS = 5 * (10**17); // kroROI = -(6 * absROI - 0.5)
+    uint256 public constant PEAK_COMMISSION_RATE = 20 * (10**16); // The proportion of profits that gets distributed to PeakDeFi referrers every cycle.
 
     // Instance variables
 
@@ -157,12 +158,14 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
 
     // PeakDeFi
     uint256 public peakReferralTotalCommissionLeft;
+    uint256 public peakManagerStakeRequired;
     mapping(uint256 => uint256) internal _peakReferralTotalCommissionOfCycle;
     mapping(address => uint256) internal _peakReferralLastCommissionRedemption;
     mapping(address => mapping(uint256 => bool))
         internal _peakReferralHasRedeemedCommissionForCycle;
     IMiniMeToken public peakReferralToken;
     PeakReward public peakReward;
+    PeakStaking public peakStaking;
 
     // Events
 

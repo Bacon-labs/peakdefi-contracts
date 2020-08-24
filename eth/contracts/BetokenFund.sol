@@ -43,7 +43,8 @@ contract BetokenFund is
         address _betokenLogic3,
         uint256 _startCycleNumber,
         address payable _dexagAddr,
-        address _peakRewardAddr
+        address _peakRewardAddr,
+        address _peakStakingAddr
     ) external {
         require(proxyAddr == address(0));
         devFundingAccount = _devFundingAccount;
@@ -58,6 +59,7 @@ contract BetokenFund is
         cycleNumber = _startCycleNumber;
 
         peakReward = PeakReward(_peakRewardAddr);
+        peakStaking = PeakStaking(_peakStakingAddr);
 
         DAI_ADDR = _daiAddr;
         KYBER_ADDR = _kyberAddr;
@@ -91,12 +93,14 @@ contract BetokenFund is
     function initRegistration(
         uint256 _newManagerKairo,
         uint256 _maxNewManagersPerCycle,
-        uint256 _kairoPrice
+        uint256 _kairoPrice,
+        uint256 _peakManagerStakeRequired
     ) external onlyOwner {
         require(_newManagerKairo > 0 && newManagerKairo == 0);
         newManagerKairo = _newManagerKairo;
         maxNewManagersPerCycle = _maxNewManagersPerCycle;
         kairoPrice = _kairoPrice;
+        peakManagerStakeRequired = _peakManagerStakeRequired;
     }
 
     function initTokenListings(
@@ -332,9 +336,7 @@ contract BetokenFund is
      */
     function registerWithDAI() public {
         (bool success, ) = betokenLogic2.delegatecall(
-            abi.encodeWithSelector(
-                this.registerWithDAI.selector
-            )
+            abi.encodeWithSelector(this.registerWithDAI.selector)
         );
         if (!success) {
             revert();
@@ -395,9 +397,7 @@ contract BetokenFund is
      * @notice Deposit DAI Stablecoin into the fund.
      * @param _daiAmount The amount of DAI to be deposited. May be different from actual deposited amount.
      */
-    function depositDAI(uint256 _daiAmount, address _referrer)
-        public
-    {
+    function depositDAI(uint256 _daiAmount, address _referrer) public {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(
                 this.depositDAI.selector,
@@ -464,9 +464,7 @@ contract BetokenFund is
      * @param _tokenAddr the address of the token to be withdrawn into the caller's account
      * @param _amountInDAI The amount of funds to be withdrawn expressed in DAI. Fixed-point decimal. May be different from actual amount.
      */
-    function withdrawToken(address _tokenAddr, uint256 _amountInDAI)
-        public
-    {
+    function withdrawToken(address _tokenAddr, uint256 _amountInDAI) public {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(
                 this.withdrawToken.selector,
@@ -497,9 +495,7 @@ contract BetokenFund is
      * @param _cycle the cycle for which the commission will be redeemed.
      *        Commissions for a cycle will be redeemed during the Intermission phase of the next cycle, so _cycle must < cycleNumber.
      */
-    function redeemCommissionForCycle(bool _inShares, uint256 _cycle)
-        public
-    {
+    function redeemCommissionForCycle(bool _inShares, uint256 _cycle) public {
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(
                 this.redeemCommissionForCycle.selector,
@@ -529,9 +525,7 @@ contract BetokenFund is
      * @notice Sells CompoundOrder left over due to manager not selling or KyberNetwork not having enough volume. Callable by anyone. Money goes to developer.
      * @param _orderAddress address of the CompoundOrder to be sold
      */
-    function sellLeftoverCompoundOrder(address payable _orderAddress)
-        public
-    {
+    function sellLeftoverCompoundOrder(address payable _orderAddress) public {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(
                 this.sellLeftoverCompoundOrder.selector,
@@ -863,9 +857,7 @@ contract BetokenFund is
      * @param _cycle the cycle for which the commission will be redeemed.
      *        Commissions for a cycle will be redeemed during the Intermission phase of the next cycle, so _cycle must < cycleNumber.
      */
-    function peakReferralRedeemCommissionForCycle(uint256 _cycle)
-        public
-    {
+    function peakReferralRedeemCommissionForCycle(uint256 _cycle) public {
         (bool success, ) = betokenLogic3.delegatecall(
             abi.encodeWithSelector(
                 this.peakReferralRedeemCommissionForCycle.selector,
@@ -875,5 +867,16 @@ contract BetokenFund is
         if (!success) {
             revert();
         }
+    }
+
+    /**
+     * @notice Changes the required PEAK stake of a new manager. Only callable by owner.
+     * @param _newValue the new value
+     */
+    function peakChangeManagerStakeRequired(uint256 _newValue)
+        public
+        onlyOwner
+    {
+        peakManagerStakeRequired = _newValue;
     }
 }

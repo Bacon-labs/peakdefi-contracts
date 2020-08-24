@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/access/roles/SignerRole.sol";
 import "../staking/PeakStaking.sol";
+import "../IUniswapOracle.sol";
 
 contract PeakReward is SignerRole {
     using SafeMath for uint256;
@@ -20,11 +21,11 @@ contract PeakReward is SignerRole {
         uint8 level
     );
     event ChangedCareerValue(address user, uint256 changeAmount, bool positive);
+    event ReceiveRankReward(address user, uint256 peakReward);
 
     modifier regUser(address user) {
         if (!isUser[user]) {
             isUser[user] = true;
-            numUsersWithRank[0] = numUsersWithRank[0].add(1);
             emit Register(user, address(0));
         }
         _;
@@ -35,8 +36,7 @@ contract PeakReward is SignerRole {
         _;
         uint256 afterRank = rankOf(user);
         if (beforeRank != afterRank) {
-            numUsersWithRank[beforeRank] = numUsersWithRank[beforeRank].sub(1);
-            numUsersWithRank[afterRank] = numUsersWithRank[afterRank].add(1);
+            _handleRankChange(user, beforeRank, afterRank);
             emit RankChange(user, beforeRank, afterRank);
         }
     }
@@ -49,7 +49,6 @@ contract PeakReward is SignerRole {
     mapping(address => address) public referrerOf;
     mapping(address => bool) public isUser;
     mapping(address => uint256) public careerValue;
-    mapping(uint256 => uint256) public numUsersWithRank;
 
     uint256[] public commissionPercentages;
     uint256[] public commissionStakeRequirements;
@@ -59,12 +58,14 @@ contract PeakReward is SignerRole {
     PeakStaking public peakStaking;
     address public peakToken;
     address public stablecoin;
+    IUniswapOracle public oracle;
 
     constructor(
         address _marketPeakWallet,
         address _peakStaking,
         address _peakToken,
-        address _stablecoin
+        address _stablecoin,
+        address _oracle
     ) public {
         // initialize commission percentages for each level
         commissionPercentages.push(10 * (10**16)); // 10%
@@ -103,6 +104,7 @@ contract PeakReward is SignerRole {
         peakStaking = PeakStaking(_peakStaking);
         peakToken = _peakToken;
         stablecoin = _stablecoin;
+        oracle = IUniswapOracle(_oracle);
     }
 
     /**
@@ -122,8 +124,6 @@ contract PeakReward is SignerRole {
         isUser[referrer] = true;
 
         referrerOf[user] = referrer;
-
-        numUsersWithRank[0] = numUsersWithRank[0].add(1);
 
         emit Register(user, referrer);
     }
@@ -205,28 +205,10 @@ contract PeakReward is SignerRole {
         public
         regUser(user)
         onlySigner
+        checkRankChange(user)
     {
         careerValue[user] = careerValue[user].add(incCV);
         emit ChangedCareerValue(user, incCV, true);
-    }
-
-    /**
-        @notice Decrements a user's career value
-        @param user The user
-        @param decCV The CV decrease amount, in Dai
-     */
-    function decrementCareerValueInDai(address user, uint256 decCV)
-        public
-        regUser(user)
-        onlySigner
-    {
-        if (careerValue[user] >= decCV) {
-            careerValue[user] = careerValue[user].sub(decCV);
-            emit ChangedCareerValue(user, decCV, false);
-        } else {
-            emit ChangedCareerValue(user, careerValue[user], false);
-            careerValue[user] = 0;
-        }
     }
 
     /**
@@ -238,6 +220,7 @@ contract PeakReward is SignerRole {
         public
         regUser(user)
         onlySigner
+        checkRankChange(user)
     {
         uint256 peakPriceInDai = _getPeakPriceInDai();
         uint256 incCVInDai = incCVInPeak.mul(peakPriceInDai).div(
@@ -253,29 +236,58 @@ contract PeakReward is SignerRole {
      */
     function rankOf(address user) public view returns (uint256) {
         uint256 cv = careerValue[user];
-        if (cv < PRECISION.mul(5000)) {
+        if (cv < PRECISION.mul(50)) {
             return 0;
-        } else if (cv < PRECISION.mul(10000)) {
+        } else if (cv < PRECISION.mul(100)) {
             return 1;
-        } else if (cv < PRECISION.mul(25000)) {
+        } else if (cv < PRECISION.mul(250)) {
             return 2;
-        } else if (cv < PRECISION.mul(50000)) {
+        } else if (cv < PRECISION.mul(500)) {
             return 3;
-        } else if (cv < PRECISION.mul(100000)) {
+        } else if (cv < PRECISION.mul(1000)) {
             return 4;
-        } else if (cv < PRECISION.mul(250000)) {
+        } else if (cv < PRECISION.mul(2500)) {
             return 5;
-        } else if (cv < PRECISION.mul(500000)) {
+        } else if (cv < PRECISION.mul(10000)) {
             return 6;
-        } else if (cv < PRECISION.mul(1000000)) {
+        } else if (cv < PRECISION.mul(30000)) {
             return 7;
-        } else if (cv < PRECISION.mul(3000000)) {
-            return 8;
-        } else if (cv < PRECISION.mul(10000000)) {
-            return 9;
         } else {
-            return 10;
+            return 8;
         }
+    }
+
+    function _handleRankChange(
+        address user,
+        uint256 beforeRank,
+        uint256 afterRank
+    ) internal {
+        uint256 rewardInDAI;
+        for (uint256 i = beforeRank.add(1); i <= afterRank; i = i.add(1)) {
+            if (i == 1) {
+                rewardInDAI = rewardInDAI.add(PRECISION.mul(100));
+            } else if (i == 2) {
+                rewardInDAI = rewardInDAI.add(PRECISION.mul(200));
+            } else if (i == 3) {
+                rewardInDAI = rewardInDAI.add(PRECISION.mul(400));
+            } else if (i == 4) {
+                rewardInDAI = rewardInDAI.add(PRECISION.mul(800));
+            } else if (i == 5) {
+                rewardInDAI = rewardInDAI.add(PRECISION.mul(1600));
+            } else if (i == 6) {
+                rewardInDAI = rewardInDAI.add(PRECISION.mul(5000));
+            } else if (i == 7) {
+                rewardInDAI = rewardInDAI.add(PRECISION.mul(10000));
+            } else {
+                rewardInDAI = rewardInDAI.add(PRECISION.mul(20000));
+            }
+        }
+
+        uint256 rewardInPeak = rewardInDAI.mul(PEAK_PRECISION).div(
+            _getPeakPriceInDai()
+        );
+        peakStaking.peakRewardMintPeakTokens(user, rewardInPeak);
+        emit ReceiveRankReward(user, rewardInPeak);
     }
 
     /**
@@ -289,8 +301,8 @@ contract PeakReward is SignerRole {
     /**
         @notice Returns the price of PEAK token in Dai, scaled by `PRECISION`.
      */
-    function _getPeakPriceInDai() internal view returns (uint256) {
-        // TODO: connect with Uniswap PEAK market
-        return PRECISION.mul(12).div(100);
+    function _getPeakPriceInDai() internal returns (uint256) {
+        oracle.update();
+        return oracle.consult(address(peakToken), PEAK_PRECISION);
     }
 }
