@@ -15,6 +15,7 @@ TestCERC20Factory = artifacts.require "TestCERC20Factory"
 PeakReward = artifacts.require "PeakReward"
 PeakStaking = artifacts.require "PeakStaking"
 PEAK_PRECISION = 1e8
+PEAK_PRICE = 0.12
 
 BigNumber = require "bignumber.js"
 
@@ -113,7 +114,7 @@ getReceiveKairoRatio = (delta) ->
   else
     # burn
     return 0
-
+###
 contract("simulation", (accounts) ->
   owner = accounts[0]
   account = accounts[1]
@@ -876,7 +877,7 @@ contract("peak_staking", (accounts) ->
     actualInterest = balanceChange.minus(stakeAmount)
     assert(epsilon_equal(actualInterest, expectedInterest), "Interest amount incorrect for stake #1")
   )
-)
+)###
 
 contract("peak_reward", (accounts) ->
   stakeAmount = 1e6 * PEAK_PRECISION
@@ -944,8 +945,39 @@ contract("peak_reward", (accounts) ->
     expectedReward1 = rawCommissionAmount * 0.02 / 0.2
     expectedReward2 = rawCommissionAmount * 0.04 / 0.2
     expectedReward3 = rawCommissionAmount * 0.1 / 0.2
-    assert(epsilon_equal(balanceChange1, expectedReward1), "account[1] commission incorrect")
-    assert(epsilon_equal(balanceChange2, expectedReward2), "account[2] commission incorrect")
-    assert(epsilon_equal(balanceChange3, expectedReward3), "account[3] commission incorrect")
+    assert(epsilon_equal(balanceChange1, expectedReward1), "accounts[1] commission incorrect")
+    assert(epsilon_equal(balanceChange2, expectedReward2), "accounts[2] commission incorrect")
+    assert(epsilon_equal(balanceChange3, expectedReward3), "accounts[3] commission incorrect")
+  )
+
+  it("rankUp()", () ->
+    # acc4 goes from rank 0 => rank 2, acc5 and acc6 go from rank 0 => rank 1
+    await peakReward.refer(accounts[5], accounts[4])
+    await peakReward.refer(accounts[6], accounts[4])
+    await peakReward.incrementCareerValueInDai(accounts[4], bnToString(100 * PRECISION))
+    await peakReward.incrementCareerValueInDai(accounts[5], bnToString(50 * PRECISION))
+    await peakReward.incrementCareerValueInDai(accounts[6], bnToString(50 * PRECISION))
+    acc4BeforeBalance = BigNumber(await peakToken.balanceOf(accounts[4]))
+    acc5BeforeBalance = BigNumber(await peakToken.balanceOf(accounts[5]))
+    acc6BeforeBalance = BigNumber(await peakToken.balanceOf(accounts[6]))
+    await peakReward.rankUp(accounts[5])
+    await peakReward.rankUp(accounts[6])
+    await peakReward.rankUp(accounts[4])
+
+    # check ranks
+    rank4 = (await peakReward.rankOf(accounts[4])).toNumber()
+    rank5 = (await peakReward.rankOf(accounts[5])).toNumber()
+    rank6 = (await peakReward.rankOf(accounts[6])).toNumber()
+    assert.equal(2, rank4, "accounts[4] wrong rank")
+    assert.equal(1, rank5, "accounts[5] wrong rank")
+    assert.equal(1, rank6, "accounts[6] wrong rank")
+
+    # check rewards
+    acc4BalanceChange = BigNumber(await peakToken.balanceOf(accounts[4])).minus(acc4BeforeBalance).div(PEAK_PRECISION)
+    acc5BalanceChange = BigNumber(await peakToken.balanceOf(accounts[5])).minus(acc5BeforeBalance).div(PEAK_PRECISION)
+    acc6BalanceChange = BigNumber(await peakToken.balanceOf(accounts[6])).minus(acc6BeforeBalance).div(PEAK_PRECISION)
+    assert(epsilon_equal(300 / PEAK_PRICE, acc4BalanceChange), "accounts[4] wrong reward")
+    assert(epsilon_equal(100 / PEAK_PRICE, acc5BalanceChange), "accounts[5] wrong reward")
+    assert(epsilon_equal(100 / PEAK_PRICE, acc6BalanceChange), "accounts[6] wrong reward")
   )
 )

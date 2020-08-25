@@ -31,16 +31,6 @@ contract PeakReward is SignerRole {
         _;
     }
 
-    modifier checkRankChange(address user) {
-        uint256 beforeRank = rankOf(user);
-        _;
-        uint256 afterRank = rankOf(user);
-        if (beforeRank != afterRank) {
-            _handleRankChange(user, beforeRank, afterRank);
-            emit RankChange(user, beforeRank, afterRank);
-        }
-    }
-
     uint256 internal constant COMMISSION_RATE = 20 * (10**16); // 20%
     uint256 internal constant PRECISION = 10**18;
     uint256 internal constant PEAK_PRECISION = 10**8;
@@ -49,6 +39,9 @@ contract PeakReward is SignerRole {
     mapping(address => address) public referrerOf;
     mapping(address => bool) public isUser;
     mapping(address => uint256) public careerValue;
+    mapping(address => uint256) public rankOf;
+    mapping(uint256 => mapping(uint256 => uint256)) public rankReward; // (beforeRank, afterRank) => rewardInPeak
+    mapping(address => mapping(uint256 => uint256)) public downlineRanks; // (referrer, rank) => numReferredUsersWithRank
 
     uint256[] public commissionPercentages;
     uint256[] public commissionStakeRequirements;
@@ -100,6 +93,31 @@ contract PeakReward is SignerRole {
         rankRewardPercentages.push(20 * (10**16)); // 20%
         rankRewardPercentages.push(40 * (10**16)); // 40%
 
+        // initialize rank rewards
+        for (uint256 i = 0; i < 8; i = i.add(1)) {
+            uint256 rewardInDAI = 0;
+            for (uint256 j = i.add(1); j <= 8; j = j.add(1)) {
+                if (j == 1) {
+                    rewardInDAI = rewardInDAI.add(PRECISION.mul(100));
+                } else if (j == 2) {
+                    rewardInDAI = rewardInDAI.add(PRECISION.mul(200));
+                } else if (j == 3) {
+                    rewardInDAI = rewardInDAI.add(PRECISION.mul(400));
+                } else if (j == 4) {
+                    rewardInDAI = rewardInDAI.add(PRECISION.mul(800));
+                } else if (j == 5) {
+                    rewardInDAI = rewardInDAI.add(PRECISION.mul(1600));
+                } else if (j == 6) {
+                    rewardInDAI = rewardInDAI.add(PRECISION.mul(5000));
+                } else if (j == 7) {
+                    rewardInDAI = rewardInDAI.add(PRECISION.mul(10000));
+                } else {
+                    rewardInDAI = rewardInDAI.add(PRECISION.mul(20000));
+                }
+                rankReward[i][j] = rewardInDAI;
+            }
+        }
+
         marketPeakWallet = _marketPeakWallet;
         peakStaking = PeakStaking(_peakStaking);
         peakToken = _peakToken;
@@ -124,6 +142,7 @@ contract PeakReward is SignerRole {
         isUser[referrer] = true;
 
         referrerOf[user] = referrer;
+        downlineRanks[referrer][0] = downlineRanks[referrer][0].add(1);
 
         emit Register(user, referrer);
     }
@@ -205,7 +224,6 @@ contract PeakReward is SignerRole {
         public
         regUser(user)
         onlySigner
-        checkRankChange(user)
     {
         careerValue[user] = careerValue[user].add(incCV);
         emit ChangedCareerValue(user, incCV, true);
@@ -220,7 +238,6 @@ contract PeakReward is SignerRole {
         public
         regUser(user)
         onlySigner
-        checkRankChange(user)
     {
         uint256 peakPriceInDai = _getPeakPriceInDai();
         uint256 incCVInDai = incCVInPeak.mul(peakPriceInDai).div(
@@ -231,10 +248,10 @@ contract PeakReward is SignerRole {
     }
 
     /**
-        @notice Returns a user's rank in the PeakDeFi system
+        @notice Returns a user's rank in the PeakDeFi system based only on career value
         @param user The user whose rank will be queried
      */
-    function rankOf(address user) public view returns (uint256) {
+    function cvRankOf(address user) public view returns (uint256) {
         uint256 cv = careerValue[user];
         if (cv < PRECISION.mul(50)) {
             return 0;
@@ -257,37 +274,40 @@ contract PeakReward is SignerRole {
         }
     }
 
-    function _handleRankChange(
-        address user,
-        uint256 beforeRank,
-        uint256 afterRank
-    ) internal {
-        uint256 rewardInDAI;
-        for (uint256 i = beforeRank.add(1); i <= afterRank; i = i.add(1)) {
-            if (i == 1) {
-                rewardInDAI = rewardInDAI.add(PRECISION.mul(100));
-            } else if (i == 2) {
-                rewardInDAI = rewardInDAI.add(PRECISION.mul(200));
-            } else if (i == 3) {
-                rewardInDAI = rewardInDAI.add(PRECISION.mul(400));
-            } else if (i == 4) {
-                rewardInDAI = rewardInDAI.add(PRECISION.mul(800));
-            } else if (i == 5) {
-                rewardInDAI = rewardInDAI.add(PRECISION.mul(1600));
-            } else if (i == 6) {
-                rewardInDAI = rewardInDAI.add(PRECISION.mul(5000));
-            } else if (i == 7) {
-                rewardInDAI = rewardInDAI.add(PRECISION.mul(10000));
-            } else {
-                rewardInDAI = rewardInDAI.add(PRECISION.mul(20000));
-            }
+    function rankUp(address user) external {
+        // verify rank up conditions
+        uint256 currentRank = rankOf[user];
+        uint256 targetRank = cvRankOf(user);
+        require(targetRank > currentRank, "PeakReward: no cv");
+        require(
+            downlineRanks[user][targetRank.sub(1)] >= 2 || targetRank == 1,
+            "PeakReward: no downline"
+        );
+
+        // increase user rank
+        rankOf[user] = targetRank;
+        address referrer = referrerOf[user];
+        if (referrer != address(0)) {
+            downlineRanks[referrer][targetRank] = downlineRanks[referrer][targetRank]
+                .add(1);
+            downlineRanks[referrer][currentRank] = downlineRanks[referrer][currentRank]
+                .sub(1);
         }
 
-        uint256 rewardInPeak = rewardInDAI.mul(PEAK_PRECISION).div(
-            _getPeakPriceInDai()
-        );
+        // give user rank reward
+        uint256 rewardInPeak = rankReward[currentRank][targetRank]
+            .mul(PEAK_PRECISION)
+            .div(_getPeakPriceInDai());
         peakStaking.peakRewardMintPeakTokens(user, rewardInPeak);
         emit ReceiveRankReward(user, rewardInPeak);
+    }
+
+    function canRankUp(address user) external view returns (bool) {
+        uint256 currentRank = rankOf[user];
+        uint256 targetRank = cvRankOf(user);
+        return
+            (targetRank > currentRank) &&
+            (downlineRanks[user][targetRank.sub(1)] >= 2);
     }
 
     /**
