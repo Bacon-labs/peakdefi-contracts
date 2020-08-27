@@ -114,7 +114,7 @@ getReceiveKairoRatio = (delta) ->
   else
     # burn
     return 0
-###
+
 contract("simulation", (accounts) ->
   owner = accounts[0]
   account = accounts[1]
@@ -877,7 +877,7 @@ contract("peak_staking", (accounts) ->
     actualInterest = balanceChange.minus(stakeAmount)
     assert(epsilon_equal(actualInterest, expectedInterest), "Interest amount incorrect for stake #1")
   )
-)###
+)
 
 contract("peak_reward", (accounts) ->
   stakeAmount = 1e6 * PEAK_PRECISION

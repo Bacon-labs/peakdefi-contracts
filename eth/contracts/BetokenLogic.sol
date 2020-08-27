@@ -130,6 +130,10 @@ contract BetokenLogic is
         require(_stake > 0);
         require(isKyberToken[_tokenAddress]);
 
+        // Verify user peak stake
+        uint256 peakStake = peakStaking.userStakeAmount(msg.sender);
+        require(peakStake >= peakManagerStakeRequired);
+
         // Collect stake
         require(cToken.generateTokens(address(this), _stake));
         require(cToken.destroyTokens(msg.sender, _stake));
@@ -352,6 +356,10 @@ contract BetokenLogic is
         require(_minPrice <= _maxPrice);
         require(_stake > 0);
         require(isCompoundToken[_tokenAddress]);
+
+        // Verify user peak stake
+        uint256 peakStake = peakStaking.userStakeAmount(msg.sender);
+        require(peakStake >= peakManagerStakeRequired);
 
         // Collect stake
         require(cToken.generateTokens(address(this), _stake));
