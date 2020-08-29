@@ -194,7 +194,7 @@ module.exports = () ->
   betokenFund = await BetokenFund.at(betokenFundAddr)
   await betokenFactory.initFund1(betokenFund.address, 'Kairo', 'KRO', 'Betoken Shares', 'BTKS')
   await betokenFactory.initFund2(betokenFund.address, tokenAddrs[0..tokenAddrs.length - 3].concat([ETH_ADDR]), compoundTokensArray)
-  await betokenFactory.initFund3(betokenFund.address, bnToString(config.NEW_MANAGER_KAIRO), bnToString(config.MAX_NEW_MANAGERS_PER_CYCLE), bnToString(config.KAIRO_PRICE), bnToString(config.PEAK_MANAGER_STAKE_REQUIRED))
+  await betokenFactory.initFund3(betokenFund.address, bnToString(config.NEW_MANAGER_KAIRO), bnToString(config.MAX_NEW_MANAGERS_PER_CYCLE), bnToString(config.KAIRO_PRICE), bnToString(config.PEAK_MANAGER_STAKE_REQUIRED), false)
   await betokenFactory.initFund4(betokenFund.address, accounts[0], config.devFundingRate, config.phaseLengths, CompoundOrderFactoryContract.address)
   await betokenFund.nextPhase()
 

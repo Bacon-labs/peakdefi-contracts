@@ -119,13 +119,15 @@ contract BetokenFactory is CloneFactory {
         uint256 _newManagerKairo,
         uint256 _maxNewManagersPerCycle,
         uint256 _kairoPrice,
-        uint256 _peakManagerStakeRequired
+        uint256 _peakManagerStakeRequired,
+        bool _isPermissioned
     ) external {
         fund.initRegistration(
             _newManagerKairo,
             _maxNewManagersPerCycle,
             _kairoPrice,
-            _peakManagerStakeRequired
+            _peakManagerStakeRequired,
+            _isPermissioned
         );
     }
 

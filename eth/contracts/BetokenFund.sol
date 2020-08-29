@@ -94,13 +94,15 @@ contract BetokenFund is
         uint256 _newManagerKairo,
         uint256 _maxNewManagersPerCycle,
         uint256 _kairoPrice,
-        uint256 _peakManagerStakeRequired
+        uint256 _peakManagerStakeRequired,
+        bool _isPermissioned
     ) external onlyOwner {
         require(_newManagerKairo > 0 && newManagerKairo == 0);
         newManagerKairo = _newManagerKairo;
         maxNewManagersPerCycle = _maxNewManagersPerCycle;
         kairoPrice = _kairoPrice;
         peakManagerStakeRequired = _peakManagerStakeRequired;
+        isPermissioned = _isPermissioned;
     }
 
     function initTokenListings(

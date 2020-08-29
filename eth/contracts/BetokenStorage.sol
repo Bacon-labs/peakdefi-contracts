@@ -166,6 +166,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
     IMiniMeToken public peakReferralToken;
     PeakReward public peakReward;
     PeakStaking public peakStaking;
+    bool public isPermissioned;
 
     // Events
 

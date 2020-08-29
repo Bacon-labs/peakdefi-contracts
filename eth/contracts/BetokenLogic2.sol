@@ -259,6 +259,7 @@ contract BetokenLogic2 is
         during(CyclePhase.Intermission)
         nonReentrant
     {
+        require(!isPermissioned);
         require(managersOnboardedThisCycle < maxNewManagersPerCycle);
         managersOnboardedThisCycle = managersOnboardedThisCycle.add(1);
 
@@ -280,6 +281,7 @@ contract BetokenLogic2 is
         during(CyclePhase.Intermission)
         nonReentrant
     {
+        require(!isPermissioned);
         require(managersOnboardedThisCycle < maxNewManagersPerCycle);
         managersOnboardedThisCycle = managersOnboardedThisCycle.add(1);
 
@@ -313,6 +315,7 @@ contract BetokenLogic2 is
         during(CyclePhase.Intermission)
         nonReentrant
     {
+        require(!isPermissioned);
         require(managersOnboardedThisCycle < maxNewManagersPerCycle);
         managersOnboardedThisCycle = managersOnboardedThisCycle.add(1);
 
@@ -342,6 +345,27 @@ contract BetokenLogic2 is
 
         // register new manager
         __register(receivedDAI);
+    }
+
+    function peakAdminRegisterManager(address _manager, uint256 _kairoAmount)
+        public
+        during(CyclePhase.Intermission)
+        nonReentrant
+        onlyOwner
+    {
+        require(isPermissioned);
+
+        // mint KRO for msg.sender
+        require(cToken.generateTokens(_manager, _kairoAmount));
+
+        // Set risk fallback base stake
+        _baseRiskStakeFallback[_manager] = _baseRiskStakeFallback[_manager].add(_kairoAmount);
+
+        // Set last active cycle for msg.sender to be the current cycle
+        _lastActiveCycle[_manager] = cycleNumber;
+
+        // emit events
+        emit Register(_manager, 0, _kairoAmount);
     }
 
     /**
