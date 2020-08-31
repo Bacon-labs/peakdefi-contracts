@@ -220,18 +220,6 @@ contract PeakStaking {
         return interestAmount;
     }
 
-    function peakRewardMintPeakTokens(address user, uint256 mintAmount)
-        external
-    {
-        require(
-            msg.sender == address(peakReward),
-            "PeakStaking: not peakReward"
-        );
-        peakToken.mint(user, mintAmount);
-        mintedPeakTokens = mintedPeakTokens.add(mintAmount);
-        require(mintedPeakTokens <= PEAK_MINT_CAP, "PeakStaking: reached cap");
-    }
-
     function _longerBonus(uint256 stakeTimeInDays)
         internal
         pure

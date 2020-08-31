@@ -53,8 +53,9 @@ async function main () {
   console.log(`Deployed PeakStaking at ${peakStaking.address}`)
   console.log(`Deployed PeakReward at ${peakReward.address}`)
 
-  // give PEAK minter rights to PeakStaking
+  // give PEAK minter rights to PeakStaking and PeakReward
   await peakToken.addMinter(peakStaking.address)
+  await peakToken.addMinter(peakReward.address)
 
   // deploy BetokenFactory
   const betokenFactory = await BetokenFactory.new(

@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/access/roles/SignerRole.sol";
 import "../staking/PeakStaking.sol";
+import "../PeakToken.sol";
 import "../IUniswapOracle.sol";
 
 contract PeakReward is SignerRole {
@@ -31,6 +32,8 @@ contract PeakReward is SignerRole {
         _;
     }
 
+    uint256 public constant PEAK_MINT_CAP = 10**17; // 1 billion PEAK
+
     uint256 internal constant COMMISSION_RATE = 20 * (10**16); // 20%
     uint256 internal constant PRECISION = 10**18;
     uint256 internal constant PEAK_PRECISION = 10**8;
@@ -46,10 +49,11 @@ contract PeakReward is SignerRole {
     uint256[] public commissionPercentages;
     uint256[] public commissionStakeRequirements;
     uint256[] public rankRewardPercentages;
+    uint256 public mintedPeakTokens;
 
     address public marketPeakWallet;
     PeakStaking public peakStaking;
-    address public peakToken;
+    PeakToken public peakToken;
     address public stablecoin;
     IUniswapOracle public oracle;
 
@@ -120,7 +124,7 @@ contract PeakReward is SignerRole {
 
         marketPeakWallet = _marketPeakWallet;
         peakStaking = PeakStaking(_peakStaking);
-        peakToken = _peakToken;
+        peakToken = PeakToken(_peakToken);
         stablecoin = _stablecoin;
         oracle = IUniswapOracle(_oracle);
     }
@@ -191,7 +195,7 @@ contract PeakReward is SignerRole {
                 }
                 token.safeTransfer(ptr, com);
                 commissionLeft = commissionLeft.sub(com);
-                if (commissionToken == peakToken) {
+                if (commissionToken == address(peakToken)) {
                     incrementCareerValueInPeak(ptr, com);
                 } else if (commissionToken == stablecoin) {
                     incrementCareerValueInDai(ptr, com);
@@ -298,7 +302,9 @@ contract PeakReward is SignerRole {
         uint256 rewardInPeak = rankReward[currentRank][targetRank]
             .mul(PEAK_PRECISION)
             .div(_getPeakPriceInDai());
-        peakStaking.peakRewardMintPeakTokens(user, rewardInPeak);
+        mintedPeakTokens = mintedPeakTokens.add(rewardInPeak);
+        require(mintedPeakTokens <= PEAK_MINT_CAP, "PeakReward: reached cap");
+        peakToken.mint(user, rewardInPeak);
         emit ReceiveRankReward(user, rewardInPeak);
     }
 
