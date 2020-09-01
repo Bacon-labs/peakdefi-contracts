@@ -72,7 +72,6 @@ async function main () {
   )
 
   await peakReward.addSigner(betokenFactory.address)
-  await peakReward.renounceSigner(accounts[0])
 
   console.log(`Deployed BetokenFactory at ${betokenFactory.address}`)
 

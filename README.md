@@ -1,14 +1,25 @@
-# BETOKEN:
-## THE DECENTRALIZED TOKEN HEDGE FUND
+# PeakDeFi
 
-[![Build Status](https://travis-ci.org/Betoken/betoken.svg?branch=develop)](https://travis-ci.org/Betoken/betoken)
+All the commands below should be executed under `eth/` directory.
 
-Betoken is a decentralized hedge fund that uses a one-of-a-kind Incentivized Meritocracy to invest in ERC20 tokens, powered by Ethereum.
+## Install packages
 
-## **[Live on Ethereum Mainnet](https://betoken.fund/portal/)**
+```bash
+npm install
+```
 
-## [Check out BetokenJS, a JavaScript library for interacting with Betoken](https://betoken.fund/betoken-js-docs/)
+## Compile
 
-## [Read the Whitepaper](https://github.com/Betoken/Whitepaper/blob/master/BetokenWhitepaper.pdf)
+```bash
+npx buidler compile
+```
 
-## [Read the formal analysis of Incentivized Meritocracy](https://github.com/Betoken/documents/blob/master/Incentivized%20Meritocracies/Incentivized%20Meritocracies.pdf)
+## Test
+
+```bash
+coffee -c . && npx buidler test
+```
+
+### Deploy
+
+See `scripts/README.md`
