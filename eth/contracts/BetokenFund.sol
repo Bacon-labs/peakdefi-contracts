@@ -591,10 +591,17 @@ contract BetokenFund is
     /**
      * @notice Sells tokens left over due to manager not selling or KyberNetwork not having enough volume. Callable by anyone. Money goes to developer.
      * @param _tokenAddr address of the token to be sold
+     * @param _calldata the 1inch trade call data
      */
-    function sellLeftoverToken(address _tokenAddr) public {
+    function sellLeftoverToken(address _tokenAddr, bytes calldata _calldata)
+        external
+    {
         (bool success, ) = betokenLogic2.delegatecall(
-            abi.encodeWithSelector(this.sellLeftoverToken.selector, _tokenAddr)
+            abi.encodeWithSelector(
+                this.sellLeftoverToken.selector,
+                _tokenAddr,
+                _calldata
+            )
         );
         if (!success) {
             revert();

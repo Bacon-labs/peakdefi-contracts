@@ -193,10 +193,6 @@ contract Utils {
     require(_actualDestAmount > 0 && _actualSrcAmount > 0);
     _destPriceInSrc = calcRateFromQty(_actualDestAmount, _actualSrcAmount, getDecimals(_destToken), getDecimals(_srcToken));
     _srcPriceInDest = calcRateFromQty(_actualSrcAmount, _actualDestAmount, getDecimals(_srcToken), getDecimals(_destToken));
-
-    // verify that the price is at least as good as Kyber
-    (, uint256 kyberSrcPriceInDest) = kyber.getExpectedRate(_srcToken, _destToken, _srcAmount);
-    require(kyberSrcPriceInDest > 0 && _srcPriceInDest >= kyberSrcPriceInDest);
   }
 
   /**

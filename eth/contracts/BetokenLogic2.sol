@@ -43,6 +43,10 @@ contract BetokenLogic2 is
 
     /**
      * @notice Deposit Ether into the fund. Ether will be converted into DAI.
+     * @param _useKyber true for Kyber Network, false for 1inch
+     * @param _calldata calldata for 1inch trading
+     * @param _referrer the referrer's address
+
      */
     function depositEtherAdvanced(
         bool _useKyber,
@@ -90,6 +94,7 @@ contract BetokenLogic2 is
     /**
      * @notice Deposit DAI Stablecoin into the fund.
      * @param _daiAmount The amount of DAI to be deposited. May be different from actual deposited amount.
+     * @param _referrer the referrer's address
      */
     function depositDAI(uint256 _daiAmount, address _referrer)
         public
@@ -118,19 +123,16 @@ contract BetokenLogic2 is
         address _referrer
     ) public {
         bytes memory nil;
-        depositTokenAdvanced(
-            _tokenAddr,
-            _tokenAmount,
-            true,
-            nil,
-            _referrer
-        );
+        depositTokenAdvanced(_tokenAddr, _tokenAmount, true, nil, _referrer);
     }
 
     /**
      * @notice Deposit ERC20 tokens into the fund. Tokens will be converted into DAI.
      * @param _tokenAddr the address of the token to be deposited
      * @param _tokenAmount The amount of tokens to be deposited. May be different from actual deposited amount.
+     * @param _useKyber true for Kyber Network, false for 1inch
+     * @param _calldata calldata for 1inch trading
+     * @param _referrer the referrer's address
      */
     function depositTokenAdvanced(
         address _tokenAddr,
@@ -191,6 +193,8 @@ contract BetokenLogic2 is
     /**
      * @notice Withdraws Ether by burning Shares.
      * @param _amountInDAI Amount of funds to be withdrawn expressed in DAI. Fixed-point decimal. May be different from actual amount.
+     * @param _useKyber true for Kyber Network, false for 1inch
+     * @param _calldata calldata for 1inch trading
      */
     function withdrawEtherAdvanced(
         uint256 _amountInDAI,
@@ -265,6 +269,8 @@ contract BetokenLogic2 is
      * @notice Withdraws funds by burning Shares, and converts the funds into the specified token using Kyber Network.
      * @param _tokenAddr the address of the token to be withdrawn into the caller's account
      * @param _amountInDAI The amount of funds to be withdrawn expressed in DAI. Fixed-point decimal. May be different from actual amount.
+     * @param _useKyber true for Kyber Network, false for 1inch
+     * @param _calldata calldata for 1inch trading
      */
     function withdrawTokenAdvanced(
         address _tokenAddr,
@@ -444,18 +450,20 @@ contract BetokenLogic2 is
     /**
      * @notice Sells tokens left over due to manager not selling or KyberNetwork not having enough volume. Callable by anyone. Money goes to developer.
      * @param _tokenAddr address of the token to be sold
+     * @param _calldata the 1inch trade call data
      */
-    function sellLeftoverToken(address _tokenAddr)
-        public
+    function sellLeftoverToken(address _tokenAddr, bytes calldata _calldata)
+        external
         during(CyclePhase.Intermission)
         nonReentrant
         isValidToken(_tokenAddr)
     {
         ERC20Detailed token = ERC20Detailed(_tokenAddr);
-        (, , uint256 actualDAIReceived, ) = __kyberTrade(
+        (, , uint256 actualDAIReceived, ) = __oneInchTrade(
             token,
             getBalance(token, address(this)),
-            dai
+            dai,
+            _calldata
         );
         totalFundsInDAI = totalFundsInDAI.add(actualDAIReceived);
     }
