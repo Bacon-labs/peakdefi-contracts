@@ -302,10 +302,12 @@ contract PeakReward is SignerRole {
         uint256 rewardInPeak = rankReward[currentRank][targetRank]
             .mul(PEAK_PRECISION)
             .div(_getPeakPriceInDai());
-        mintedPeakTokens = mintedPeakTokens.add(rewardInPeak);
-        require(mintedPeakTokens <= PEAK_MINT_CAP, "PeakReward: reached cap");
-        peakToken.mint(user, rewardInPeak);
-        emit ReceiveRankReward(user, rewardInPeak);
+        if (mintedPeakTokens.add(rewardInPeak) <= PEAK_MINT_CAP) {
+            // mint if under cap, do nothing if over cap
+            mintedPeakTokens = mintedPeakTokens.add(rewardInPeak);
+            peakToken.mint(user, rewardInPeak);
+            emit ReceiveRankReward(user, rewardInPeak);
+        }
     }
 
     function canRankUp(address user) external view returns (bool) {
