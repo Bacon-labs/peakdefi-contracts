@@ -28,7 +28,7 @@ contract Utils {
 
   address public DAI_ADDR;
   address payable public KYBER_ADDR;
-  address payable public DEXAG_ADDR;
+  address payable public ONEINCH_ADDR;
 
   bytes public constant PERM_HINT = "PERM";
 
@@ -44,11 +44,11 @@ contract Utils {
   constructor(
     address _daiAddr,
     address payable _kyberAddr,
-    address payable _dexagAddr
+    address payable _oneInchAddr
   ) public {
     DAI_ADDR = _daiAddr;
     KYBER_ADDR = _kyberAddr;
-    DEXAG_ADDR = _dexagAddr;
+    ONEINCH_ADDR = _oneInchAddr;
 
     dai = ERC20Detailed(_daiAddr);
     kyber = KyberNetwork(_kyberAddr);
@@ -150,7 +150,7 @@ contract Utils {
   }
 
   /**
-   * @notice Wrapper function for doing token conversion on dex.ag
+   * @notice Wrapper function for doing token conversion on 1inch
    * @param _srcToken the token to convert from
    * @param _srcAmount the amount of tokens to be converted
    * @param _destToken the destination token
@@ -159,7 +159,7 @@ contract Utils {
    *         _actualDestAmount actual amount of dest token traded
    *         _actualSrcAmount actual amount of src token traded
    */
-  function __dexagTrade(ERC20Detailed _srcToken, uint256 _srcAmount, ERC20Detailed _destToken, bytes memory _calldata)
+  function __oneInchTrade(ERC20Detailed _srcToken, uint256 _srcAmount, ERC20Detailed _destToken, bytes memory _calldata)
     internal
     returns(
       uint256 _destPriceInSrc,
@@ -175,7 +175,7 @@ contract Utils {
     // Note: _actualSrcAmount is being used as msgValue here, because otherwise we'd run into the stack too deep error
     if (_srcToken != ETH_TOKEN_ADDRESS) {
       _actualSrcAmount = 0;
-      OneInchExchange dex = OneInchExchange(DEXAG_ADDR);
+      OneInchExchange dex = OneInchExchange(ONEINCH_ADDR);
       address approvalHandler = dex.spender();
       _srcToken.safeApprove(approvalHandler, 0);
       _srcToken.safeApprove(approvalHandler, _srcAmount);
@@ -183,8 +183,8 @@ contract Utils {
       _actualSrcAmount = _srcAmount;
     }
 
-    // trade through dex.ag proxy
-    (bool success,) = DEXAG_ADDR.call.value(_actualSrcAmount)(_calldata);
+    // trade through 1inch proxy
+    (bool success,) = ONEINCH_ADDR.call.value(_actualSrcAmount)(_calldata);
     require(success);
 
     // calculate trade amounts and price

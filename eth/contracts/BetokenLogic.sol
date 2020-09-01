@@ -110,8 +110,8 @@ contract BetokenLogic is
      * @param _stake amount of Kairos to be staked in support of the investment
      * @param _minPrice the minimum price for the trade
      * @param _maxPrice the maximum price for the trade
-     * @param _calldata calldata for dex.ag trading
-     * @param _useKyber true for Kyber Network, false for dex.ag
+     * @param _calldata calldata for 1inch trading
+     * @param _useKyber true for Kyber Network, false for 1inch
      */
     function createInvestmentV2(
         address _tokenAddress,
@@ -647,8 +647,8 @@ contract BetokenLogic is
      * @param _minPrice the minimum price for the trade
      * @param _maxPrice the maximum price for the trade
      * @param _buy whether to buy or sell the given investment
-     * @param _calldata calldata for dex.ag trading
-     * @param _useKyber true for Kyber Network, false for dex.ag
+     * @param _calldata calldata for 1inch trading
+     * @param _useKyber true for Kyber Network, false for 1inch
      */
     function __handleInvestment(
         uint256 _investmentId,
@@ -657,7 +657,7 @@ contract BetokenLogic is
         bool _buy,
         bytes memory _calldata,
         bool _useKyber
-    ) public returns (uint256 _actualDestAmount, uint256 _actualSrcAmount) {
+    ) internal returns (uint256 _actualDestAmount, uint256 _actualSrcAmount) {
         Investment storage investment = userInvestments[msg
             .sender][_investmentId];
         address token = investment.tokenAddress;
@@ -679,13 +679,13 @@ contract BetokenLogic is
                     ERC20Detailed(token)
                 );
             } else {
-                // dex.ag trading
+                // 1inch trading
                 (
                     dInS,
                     sInD,
                     _actualDestAmount,
                     _actualSrcAmount
-                ) = __dexagTrade(
+                ) = __oneInchTrade(
                     dai,
                     totalFundsInDAI.mul(investment.stake).div(
                         cToken.totalSupply()
@@ -716,7 +716,7 @@ contract BetokenLogic is
                     sInD,
                     _actualDestAmount,
                     _actualSrcAmount
-                ) = __dexagTrade(
+                ) = __oneInchTrade(
                     ERC20Detailed(token),
                     investment.tokenAmount,
                     dai,

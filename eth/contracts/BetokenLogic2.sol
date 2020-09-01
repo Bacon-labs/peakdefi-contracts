@@ -2,6 +2,7 @@ pragma solidity 0.5.17;
 
 import "./BetokenStorage.sol";
 import "./derivatives/CompoundOrderFactory.sol";
+import "@nomiclabs/buidler/console.sol";
 
 /**
  * @title Part of the functions for BetokenFund
@@ -35,23 +36,36 @@ contract BetokenLogic2 is
      * Deposit & Withdraw
      */
 
+    function depositEther(address _referrer) public payable {
+        bytes memory nil;
+        depositEtherAdvanced(true, nil, _referrer);
+    }
+
     /**
      * @notice Deposit Ether into the fund. Ether will be converted into DAI.
      */
-    function depositEther(address _referrer)
-        public
-        payable
-        nonReentrant
-        notReadyForUpgrade
-    {
+    function depositEtherAdvanced(
+        bool _useKyber,
+        bytes memory _calldata,
+        address _referrer
+    ) public payable nonReentrant notReadyForUpgrade {
         // Buy DAI with ETH
         uint256 actualDAIDeposited;
         uint256 actualETHDeposited;
-        (, , actualDAIDeposited, actualETHDeposited) = __kyberTrade(
-            ETH_TOKEN_ADDRESS,
-            msg.value,
-            dai
-        );
+        if (_useKyber) {
+            (, , actualDAIDeposited, actualETHDeposited) = __kyberTrade(
+                ETH_TOKEN_ADDRESS,
+                msg.value,
+                dai
+            );
+        } else {
+            (, , actualDAIDeposited, actualETHDeposited) = __oneInchTrade(
+                ETH_TOKEN_ADDRESS,
+                msg.value,
+                dai,
+                _calldata
+            );
+        }
 
         // Send back leftover ETH
         uint256 leftOverETH = msg.value.sub(actualETHDeposited);
@@ -98,14 +112,31 @@ contract BetokenLogic2 is
         );
     }
 
+    function depositToken(
+        address _tokenAddr,
+        uint256 _tokenAmount,
+        address _referrer
+    ) public {
+        bytes memory nil;
+        depositTokenAdvanced(
+            _tokenAddr,
+            _tokenAmount,
+            true,
+            nil,
+            _referrer
+        );
+    }
+
     /**
      * @notice Deposit ERC20 tokens into the fund. Tokens will be converted into DAI.
      * @param _tokenAddr the address of the token to be deposited
      * @param _tokenAmount The amount of tokens to be deposited. May be different from actual deposited amount.
      */
-    function depositToken(
+    function depositTokenAdvanced(
         address _tokenAddr,
         uint256 _tokenAmount,
+        bool _useKyber,
+        bytes memory _calldata,
         address _referrer
     ) public nonReentrant notReadyForUpgrade isValidToken(_tokenAddr) {
         require(
@@ -115,16 +146,23 @@ contract BetokenLogic2 is
         ERC20Detailed token = ERC20Detailed(_tokenAddr);
 
         token.safeTransferFrom(msg.sender, address(this), _tokenAmount);
-
         // Convert token into DAI
         uint256 actualDAIDeposited;
         uint256 actualTokenDeposited;
-        (, , actualDAIDeposited, actualTokenDeposited) = __kyberTrade(
-            token,
-            _tokenAmount,
-            dai
-        );
-
+        if (_useKyber) {
+            (, , actualDAIDeposited, actualTokenDeposited) = __kyberTrade(
+                token,
+                _tokenAmount,
+                dai
+            );
+        } else {
+            (, , actualDAIDeposited, actualTokenDeposited) = __oneInchTrade(
+                token,
+                _tokenAmount,
+                dai,
+                _calldata
+            );
+        }
         // Give back leftover tokens
         uint256 leftOverTokens = _tokenAmount.sub(actualTokenDeposited);
         if (leftOverTokens > 0) {
@@ -145,23 +183,37 @@ contract BetokenLogic2 is
         );
     }
 
+    function withdrawEther(uint256 _amountInDAI) external {
+        bytes memory nil;
+        withdrawEtherAdvanced(_amountInDAI, true, nil);
+    }
+
     /**
      * @notice Withdraws Ether by burning Shares.
      * @param _amountInDAI Amount of funds to be withdrawn expressed in DAI. Fixed-point decimal. May be different from actual amount.
      */
-    function withdrawEther(uint256 _amountInDAI)
-        public
-        nonReentrant
-        during(CyclePhase.Intermission)
-    {
+    function withdrawEtherAdvanced(
+        uint256 _amountInDAI,
+        bool _useKyber,
+        bytes memory _calldata
+    ) public nonReentrant during(CyclePhase.Intermission) {
         // Buy ETH
         uint256 actualETHWithdrawn;
         uint256 actualDAIWithdrawn;
-        (, , actualETHWithdrawn, actualDAIWithdrawn) = __kyberTrade(
-            dai,
-            _amountInDAI,
-            ETH_TOKEN_ADDRESS
-        );
+        if (_useKyber) {
+            (, , actualETHWithdrawn, actualDAIWithdrawn) = __kyberTrade(
+                dai,
+                _amountInDAI,
+                ETH_TOKEN_ADDRESS
+            );
+        } else {
+            (, , actualETHWithdrawn, actualDAIWithdrawn) = __oneInchTrade(
+                dai,
+                _amountInDAI,
+                ETH_TOKEN_ADDRESS,
+                _calldata
+            );
+        }
 
         __withdraw(actualDAIWithdrawn);
 
@@ -184,7 +236,7 @@ contract BetokenLogic2 is
      * @param _amountInDAI Amount of funds to be withdrawn expressed in DAI. Fixed-point decimal. May be different from actual amount.
      */
     function withdrawDAI(uint256 _amountInDAI)
-        public
+        external
         nonReentrant
         during(CyclePhase.Intermission)
     {
@@ -204,12 +256,22 @@ contract BetokenLogic2 is
         );
     }
 
+    function withdrawToken(address _tokenAddr, uint256 _amountInDAI) external {
+        bytes memory nil;
+        withdrawTokenAdvanced(_tokenAddr, _amountInDAI, true, nil);
+    }
+
     /**
      * @notice Withdraws funds by burning Shares, and converts the funds into the specified token using Kyber Network.
      * @param _tokenAddr the address of the token to be withdrawn into the caller's account
      * @param _amountInDAI The amount of funds to be withdrawn expressed in DAI. Fixed-point decimal. May be different from actual amount.
      */
-    function withdrawToken(address _tokenAddr, uint256 _amountInDAI)
+    function withdrawTokenAdvanced(
+        address _tokenAddr,
+        uint256 _amountInDAI,
+        bool _useKyber,
+        bytes memory _calldata
+    )
         public
         during(CyclePhase.Intermission)
         nonReentrant
@@ -224,11 +286,20 @@ contract BetokenLogic2 is
         // Convert DAI into desired tokens
         uint256 actualTokenWithdrawn;
         uint256 actualDAIWithdrawn;
-        (, , actualTokenWithdrawn, actualDAIWithdrawn) = __kyberTrade(
-            dai,
-            _amountInDAI,
-            token
-        );
+        if (_useKyber) {
+            (, , actualTokenWithdrawn, actualDAIWithdrawn) = __kyberTrade(
+                dai,
+                _amountInDAI,
+                token
+            );
+        } else {
+            (, , actualTokenWithdrawn, actualDAIWithdrawn) = __oneInchTrade(
+                dai,
+                _amountInDAI,
+                token,
+                _calldata
+            );
+        }
 
         __withdraw(actualDAIWithdrawn);
 
@@ -359,7 +430,9 @@ contract BetokenLogic2 is
         require(cToken.generateTokens(_manager, _kairoAmount));
 
         // Set risk fallback base stake
-        _baseRiskStakeFallback[_manager] = _baseRiskStakeFallback[_manager].add(_kairoAmount);
+        _baseRiskStakeFallback[_manager] = _baseRiskStakeFallback[_manager].add(
+            _kairoAmount
+        );
 
         // Set last active cycle for msg.sender to be the current cycle
         _lastActiveCycle[_manager] = cycleNumber;

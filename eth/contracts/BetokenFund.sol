@@ -42,7 +42,7 @@ contract BetokenFund is
         address _betokenLogic2,
         address _betokenLogic3,
         uint256 _startCycleNumber,
-        address payable _dexagAddr,
+        address payable _oneInchAddr,
         address _peakRewardAddr,
         address _peakStakingAddr
     ) external {
@@ -63,7 +63,7 @@ contract BetokenFund is
 
         DAI_ADDR = _daiAddr;
         KYBER_ADDR = _kyberAddr;
-        DEXAG_ADDR = _dexagAddr;
+        ONEINCH_ADDR = _oneInchAddr;
 
         dai = ERC20Detailed(_daiAddr);
         kyber = KyberNetwork(_kyberAddr);
@@ -395,6 +395,24 @@ contract BetokenFund is
         }
     }
 
+    function depositEtherAdvanced(
+        bool _useKyber,
+        bytes calldata _calldata,
+        address _referrer
+    ) external payable {
+        (bool success, ) = betokenLogic2.delegatecall(
+            abi.encodeWithSelector(
+                this.depositEtherAdvanced.selector,
+                _useKyber,
+                _calldata,
+                _referrer
+            )
+        );
+        if (!success) {
+            revert();
+        }
+    }
+
     /**
      * @notice Deposit DAI Stablecoin into the fund.
      * @param _daiAmount The amount of DAI to be deposited. May be different from actual deposited amount.
@@ -435,13 +453,53 @@ contract BetokenFund is
         }
     }
 
+    function depositTokenAdvanced(
+        address _tokenAddr,
+        uint256 _tokenAmount,
+        bool _useKyber,
+        bytes calldata _calldata,
+        address _referrer
+    ) external {
+        (bool success, ) = betokenLogic2.delegatecall(
+            abi.encodeWithSelector(
+                this.depositTokenAdvanced.selector,
+                _tokenAddr,
+                _tokenAmount,
+                _useKyber,
+                _calldata,
+                _referrer
+            )
+        );
+        if (!success) {
+            revert();
+        }
+    }
+
     /**
      * @notice Withdraws Ether by burning Shares.
      * @param _amountInDAI Amount of funds to be withdrawn expressed in DAI. Fixed-point decimal. May be different from actual amount.
      */
-    function withdrawEther(uint256 _amountInDAI) public {
+    function withdrawEther(uint256 _amountInDAI) external {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(this.withdrawEther.selector, _amountInDAI)
+        );
+        if (!success) {
+            revert();
+        }
+    }
+
+    function withdrawEtherAdvanced(
+        uint256 _amountInDAI,
+        bool _useKyber,
+        bytes calldata _calldata
+    ) external {
+        (bool success, ) = betokenLogic2.delegatecall(
+            abi.encodeWithSelector(
+                this.withdrawEtherAdvanced.selector,
+                _amountInDAI,
+                _useKyber,
+                _calldata
+            )
         );
         if (!success) {
             revert();
@@ -466,12 +524,32 @@ contract BetokenFund is
      * @param _tokenAddr the address of the token to be withdrawn into the caller's account
      * @param _amountInDAI The amount of funds to be withdrawn expressed in DAI. Fixed-point decimal. May be different from actual amount.
      */
-    function withdrawToken(address _tokenAddr, uint256 _amountInDAI) public {
+    function withdrawToken(address _tokenAddr, uint256 _amountInDAI) external {
         (bool success, ) = betokenLogic2.delegatecall(
             abi.encodeWithSelector(
                 this.withdrawToken.selector,
                 _tokenAddr,
                 _amountInDAI
+            )
+        );
+        if (!success) {
+            revert();
+        }
+    }
+
+    function withdrawTokenAdvanced(
+        address _tokenAddr,
+        uint256 _amountInDAI,
+        bool _useKyber,
+        bytes calldata _calldata
+    ) external {
+        (bool success, ) = betokenLogic2.delegatecall(
+            abi.encodeWithSelector(
+                this.withdrawTokenAdvanced.selector,
+                _tokenAddr,
+                _amountInDAI,
+                _useKyber,
+                _calldata
             )
         );
         if (!success) {
@@ -589,8 +667,8 @@ contract BetokenFund is
      * @param _stake amount of Kairos to be staked in support of the investment
      * @param _minPrice the minimum price for the trade
      * @param _maxPrice the maximum price for the trade
-     * @param _calldata calldata for dex.ag trading
-     * @param _useKyber true for Kyber Network, false for dex.ag
+     * @param _calldata calldata for 1inch trading
+     * @param _useKyber true for Kyber Network, false for 1inch
      */
     function createInvestmentV2(
         address _tokenAddress,
