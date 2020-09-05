@@ -356,7 +356,7 @@ contract("simulation", (accounts) ->
 
     # buy token
     amount = NEW_MANAGER_KAIRO
-    await this.fund.createInvestment(token.address, bnToString(amount), 0, MAX_PRICE, {from: account})
+    await this.fund.createInvestment(token.address, bnToString(amount), MAX_PRICE, {from: account})
 
     # check KRO balance
     kroBlnce = BigNumber await kro.balanceOf.call(account)
@@ -370,7 +370,7 @@ contract("simulation", (accounts) ->
 
     # create investment for account2
     account2 = accounts[2]
-    await this.fund.createInvestment(ETH_ADDR, bnToString(amount), 0, bnToString(ETH_PRICE * 2), {from: account2})
+    await this.fund.createInvestment(ETH_ADDR, bnToString(amount), bnToString(ETH_PRICE * 2), {from: account2})
   )
 
   it("sell_investment", () ->
@@ -387,7 +387,7 @@ contract("simulation", (accounts) ->
 
     # sell investment
     tokenAmount = BigNumber((await this.fund.userInvestments.call(account, 0)).tokenAmount)
-    await this.fund.sellInvestmentAsset(0, bnToString(tokenAmount), 0, MAX_PRICE, {from: account})
+    await this.fund.sellInvestmentAsset(0, bnToString(tokenAmount), 0, {from: account})
 
     # check KRO balance
     kroBlnce = BigNumber await kro.balanceOf.call(account)
@@ -407,8 +407,8 @@ contract("simulation", (accounts) ->
     await timeTravel(2 * DAY)
     tokenAmount = BigNumber((await this.fund.userInvestments.call(account2, 0)).tokenAmount)
     # sell half of the investment, then sell the rest
-    await this.fund.sellInvestmentAsset(0, bnToString(tokenAmount.div(2)), 0, bnToString(ETH_PRICE * 2), {from: account2})
-    await this.fund.sellInvestmentAsset(1, bnToString(tokenAmount.div(2)), 0, bnToString(ETH_PRICE * 2), {from: account2})
+    await this.fund.sellInvestmentAsset(0, bnToString(tokenAmount.div(2)), 0, {from: account2})
+    await this.fund.sellInvestmentAsset(1, bnToString(tokenAmount.div(2)), 0, {from: account2})
   )
 
   it("create_compound_orders", () ->
@@ -424,7 +424,7 @@ contract("simulation", (accounts) ->
 
     # create short order
     amount = 0.01 * PRECISION
-    await this.fund.createCompoundOrder(true, cToken.address, bnToString(amount), 0, MAX_PRICE, {from: account})
+    await this.fund.createCompoundOrder(account, true, cToken.address, bnToString(amount), 0, MAX_PRICE, {from: account})
     shortOrder = await CO(this.fund, account, 0)
 
     # check KRO balance
@@ -438,7 +438,7 @@ contract("simulation", (accounts) ->
 
     # create long order for account2
     account2 = accounts[2]
-    await this.fund.createCompoundOrder(false, (await TestCEther.deployed()).address, bnToString(amount), 0, bnToString(ETH_PRICE * 2), {from: account2})
+    await this.fund.createCompoundOrder(account2, false, (await TestCEther.deployed()).address, bnToString(amount), 0, bnToString(ETH_PRICE * 2), {from: account2})
   )
 
   it("sell_compound_orders", () ->
@@ -456,7 +456,7 @@ contract("simulation", (accounts) ->
 
     # sell short order
     shortOrder = await CO(this.fund, account, 0)
-    await this.fund.sellCompoundOrder(0, 0, MAX_PRICE, {from: account})
+    await this.fund.sellCompoundOrder(account, 0, 0, MAX_PRICE, {from: account})
 
     # check KRO balance
     kroBlnce = BigNumber await kro.balanceOf.call(account)
@@ -479,7 +479,7 @@ contract("simulation", (accounts) ->
 
     # sell account2's long order
     longOrder = await CO(this.fund, account2, 0)
-    await this.fund.sellCompoundOrder(0, 0, bnToString(ETH_PRICE * 2), {from: account2})
+    await this.fund.sellCompoundOrder(account2, 0, 0, bnToString(ETH_PRICE * 2), {from: account2})
 
     # check KRO balance
     kroBlnce = BigNumber await kro.balanceOf.call(account2)
@@ -623,14 +623,14 @@ contract("price_changes", (accounts) ->
     # invest in asset
     stake = 0.1 * PRECISION
     investmentId = 0
-    await this.fund.createInvestment(omg.address, bnToString(stake), 0, MAX_PRICE, {from: account})
+    await this.fund.createInvestment(omg.address, bnToString(stake), MAX_PRICE, {from: account})
 
     # create short order
     shortId = 0
-    await this.fund.createCompoundOrder(true, cOMG.address, bnToString(stake), 0, MAX_PRICE, {from: account})
+    await this.fund.createCompoundOrder(account, true, cOMG.address, bnToString(stake), 0, MAX_PRICE, {from: account})
     # create long order
     longId = 1
-    await this.fund.createCompoundOrder(false, cOMG.address, bnToString(stake), 0, MAX_PRICE, {from: account})
+    await this.fund.createCompoundOrder(account, false, cOMG.address, bnToString(stake), 0, MAX_PRICE, {from: account})
 
     # raise asset price by 20%
     delta = 0.2
@@ -642,7 +642,7 @@ contract("price_changes", (accounts) ->
     prevKROBlnce = BigNumber await kro.balanceOf.call(account)
     prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
     tokenAmount = BigNumber((await this.fund.userInvestments.call(account, investmentId)).tokenAmount)
-    await this.fund.sellInvestmentAsset(investmentId, tokenAmount, 0, MAX_PRICE, {from: account})
+    await this.fund.sellInvestmentAsset(investmentId, tokenAmount, 0, {from: account})
 
     # check KRO reward
     kroBlnce = BigNumber await kro.balanceOf.call(account)
@@ -656,7 +656,7 @@ contract("price_changes", (accounts) ->
     # sell short order
     prevKROBlnce = BigNumber await kro.balanceOf.call(account)
     prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
-    await this.fund.sellCompoundOrder(shortId, 0, MAX_PRICE, {from: account})
+    await this.fund.sellCompoundOrder(account, shortId, 0, MAX_PRICE, {from: account})
 
     # check KRO penalty
     kroBlnce = BigNumber await kro.balanceOf.call(account)
@@ -670,7 +670,7 @@ contract("price_changes", (accounts) ->
     # sell long order
     prevKROBlnce = BigNumber await kro.balanceOf.call(account)
     prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
-    await this.fund.sellCompoundOrder(longId, 0, MAX_PRICE, {from: account})
+    await this.fund.sellCompoundOrder(account, longId, 0, MAX_PRICE, {from: account})
 
     # check KRO reward
     kroBlnce = BigNumber await kro.balanceOf.call(account)
@@ -697,14 +697,14 @@ contract("price_changes", (accounts) ->
     # invest in asset
     stake = 0.1 * PRECISION
     investmentId = 1
-    await this.fund.createInvestment(omg.address, bnToString(stake), 0, MAX_PRICE, {from: account})
+    await this.fund.createInvestment(omg.address, bnToString(stake), MAX_PRICE, {from: account})
 
     # create short order
     shortId = 2
-    await this.fund.createCompoundOrder(true, cOMG.address, bnToString(stake), 0, MAX_PRICE, {from: account})
+    await this.fund.createCompoundOrder(account, true, cOMG.address, bnToString(stake), 0, MAX_PRICE, {from: account})
     # create long order
     longId = 3
-    await this.fund.createCompoundOrder(false, cOMG.address, bnToString(stake), 0, MAX_PRICE, {from: account})
+    await this.fund.createCompoundOrder(account, false, cOMG.address, bnToString(stake), 0, MAX_PRICE, {from: account})
 
     # lower asset price by 20%
     delta = -0.2
@@ -716,7 +716,7 @@ contract("price_changes", (accounts) ->
     prevKROBlnce = BigNumber await kro.balanceOf.call(account)
     prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
     tokenAmount = BigNumber((await this.fund.userInvestments.call(account, investmentId)).tokenAmount)
-    await this.fund.sellInvestmentAsset(investmentId, tokenAmount, 0, MAX_PRICE, {from: account})
+    await this.fund.sellInvestmentAsset(investmentId, tokenAmount, 0, {from: account})
 
     # check KRO penalty
     kroBlnce = BigNumber await kro.balanceOf.call(account)
@@ -730,7 +730,7 @@ contract("price_changes", (accounts) ->
     # sell short order
     prevKROBlnce = BigNumber await kro.balanceOf.call(account)
     prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
-    await this.fund.sellCompoundOrder(shortId, 0, MAX_PRICE, {from: account})
+    await this.fund.sellCompoundOrder(account, shortId, 0, MAX_PRICE, {from: account})
 
     # check KRO reward
     kroBlnce = BigNumber await kro.balanceOf.call(account)
@@ -744,7 +744,7 @@ contract("price_changes", (accounts) ->
     # sell long order
     prevKROBlnce = BigNumber await kro.balanceOf.call(account)
     prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
-    await this.fund.sellCompoundOrder(longId, 0, MAX_PRICE, {from: account})
+    await this.fund.sellCompoundOrder(account, longId, 0, MAX_PRICE, {from: account})
 
     # check KRO penalty
     kroBlnce = BigNumber await kro.balanceOf.call(account)
@@ -771,7 +771,7 @@ contract("price_changes", (accounts) ->
     # invest in asset
     stake = 0.1 * PRECISION
     investmentId = 2
-    await this.fund.createInvestment(omg.address, bnToString(stake), 0, MAX_PRICE, {from: account})
+    await this.fund.createInvestment(omg.address, bnToString(stake), MAX_PRICE, {from: account})
 
     # lower asset price by 99.99%
     delta = -0.9999
@@ -782,7 +782,7 @@ contract("price_changes", (accounts) ->
     # sell asset
     prevKROBlnce = BigNumber await kro.balanceOf.call(account)
     tokenAmount = BigNumber((await this.fund.userInvestments.call(account, investmentId)).tokenAmount)
-    await this.fund.sellInvestmentAsset(investmentId, tokenAmount, 0, MAX_PRICE, {from: account})
+    await this.fund.sellInvestmentAsset(investmentId, tokenAmount, 0, {from: account})
 
     # check KRO penalty
     kroBlnce = BigNumber await kro.balanceOf.call(account)

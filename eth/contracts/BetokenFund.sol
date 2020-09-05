@@ -240,7 +240,7 @@ contract BetokenFund is
         public
         returns (uint256 _commission, uint256 _penalty)
     {
-        (bool success, bytes memory result) = betokenLogic.delegatecall(
+        (bool success, bytes memory result) = betokenLogic3.delegatecall(
             abi.encodeWithSelector(this.commissionBalanceOf.selector, _manager)
         );
         if (!success) {
@@ -257,7 +257,7 @@ contract BetokenFund is
         public
         returns (uint256 _commission, uint256 _penalty)
     {
-        (bool success, bytes memory result) = betokenLogic.delegatecall(
+        (bool success, bytes memory result) = betokenLogic3.delegatecall(
             abi.encodeWithSelector(
                 this.commissionOfAt.selector,
                 _manager,
@@ -561,7 +561,7 @@ contract BetokenFund is
      * @notice Redeems commission.
      */
     function redeemCommission(bool _inShares) public {
-        (bool success, ) = betokenLogic.delegatecall(
+        (bool success, ) = betokenLogic3.delegatecall(
             abi.encodeWithSelector(this.redeemCommission.selector, _inShares)
         );
         if (!success) {
@@ -576,7 +576,7 @@ contract BetokenFund is
      *        Commissions for a cycle will be redeemed during the Intermission phase of the next cycle, so _cycle must < cycleNumber.
      */
     function redeemCommissionForCycle(bool _inShares, uint256 _cycle) public {
-        (bool success, ) = betokenLogic.delegatecall(
+        (bool success, ) = betokenLogic3.delegatecall(
             abi.encodeWithSelector(
                 this.redeemCommissionForCycle.selector,
                 _inShares,
@@ -641,17 +641,147 @@ contract BetokenFund is
      * Manage phase functions
      */
 
+    function createInvestmentWithSignature(
+        address _tokenAddress,
+        uint256 _stake,
+        uint256 _maxPrice,
+        bytes calldata _calldata,
+        bool _useKyber,
+        address _manager,
+        uint256 _salt,
+        bytes calldata _signature
+    ) external {
+        (bool success, ) = betokenLogic.delegatecall(
+            abi.encodeWithSelector(
+                this.createInvestmentWithSignature.selector,
+                _tokenAddress,
+                _stake,
+                _maxPrice,
+                _calldata,
+                _useKyber,
+                _manager,
+                _salt,
+                _signature
+            )
+        );
+        if (!success) {
+            revert();
+        }
+    }
+
+    function sellInvestmentWithSignature(
+        uint256 _investmentId,
+        uint256 _tokenAmount,
+        uint256 _minPrice,
+        uint256 _maxPrice,
+        bytes calldata _calldata,
+        bool _useKyber,
+        address _manager,
+        uint256 _salt,
+        bytes calldata _signature
+    ) external {
+        (bool success, ) = betokenLogic.delegatecall(
+            abi.encodeWithSelector(
+                this.sellInvestmentWithSignature.selector,
+                _investmentId,
+                _tokenAmount,
+                _minPrice,
+                _maxPrice,
+                _calldata,
+                _useKyber,
+                _manager,
+                _salt,
+                _signature
+            )
+        );
+        if (!success) {
+            revert();
+        }
+    }
+
+    function createCompoundOrderWithSignature(
+        bool _orderType,
+        address _tokenAddress,
+        uint256 _stake,
+        uint256 _minPrice,
+        uint256 _maxPrice,
+        address _manager,
+        uint256 _salt,
+        bytes calldata _signature
+    ) external {
+        (bool success, ) = betokenLogic.delegatecall(
+            abi.encodeWithSelector(
+                this.createCompoundOrderWithSignature.selector,
+                _orderType,
+                _tokenAddress,
+                _stake,
+                _minPrice,
+                _maxPrice,
+                _manager,
+                _salt,
+                _signature
+            )
+        );
+        if (!success) {
+            revert();
+        }
+    }
+
+    function sellCompoundOrderWithSignature(
+        uint256 _orderId,
+        uint256 _minPrice,
+        uint256 _maxPrice,
+        address _manager,
+        uint256 _salt,
+        bytes calldata _signature
+    ) external {
+        (bool success, ) = betokenLogic.delegatecall(
+            abi.encodeWithSelector(
+                this.sellCompoundOrderWithSignature.selector,
+                _orderId,
+                _minPrice,
+                _maxPrice,
+                _manager,
+                _salt,
+                _signature
+            )
+        );
+        if (!success) {
+            revert();
+        }
+    }
+
+    function repayCompoundOrderWithSignature(
+        uint256 _orderId,
+        uint256 _repayAmountInDAI,
+        address _manager,
+        uint256 _salt,
+        bytes calldata _signature
+    ) external {
+        (bool success, ) = betokenLogic.delegatecall(
+            abi.encodeWithSelector(
+                this.repayCompoundOrderWithSignature.selector,
+                _orderId,
+                _repayAmountInDAI,
+                _manager,
+                _salt,
+                _signature
+            )
+        );
+        if (!success) {
+            revert();
+        }
+    }
+
     /**
      * @notice Creates a new investment for an ERC20 token.
      * @param _tokenAddress address of the ERC20 token contract
      * @param _stake amount of Kairos to be staked in support of the investment
-     * @param _minPrice the minimum price for the trade
      * @param _maxPrice the maximum price for the trade
      */
     function createInvestment(
         address _tokenAddress,
         uint256 _stake,
-        uint256 _minPrice,
         uint256 _maxPrice
     ) public {
         (bool success, ) = betokenLogic.delegatecall(
@@ -659,7 +789,6 @@ contract BetokenFund is
                 this.createInvestment.selector,
                 _tokenAddress,
                 _stake,
-                _minPrice,
                 _maxPrice
             )
         );
@@ -672,15 +801,14 @@ contract BetokenFund is
      * @notice Creates a new investment for an ERC20 token.
      * @param _tokenAddress address of the ERC20 token contract
      * @param _stake amount of Kairos to be staked in support of the investment
-     * @param _minPrice the minimum price for the trade
      * @param _maxPrice the maximum price for the trade
      * @param _calldata calldata for 1inch trading
      * @param _useKyber true for Kyber Network, false for 1inch
      */
     function createInvestmentV2(
+        address _sender,
         address _tokenAddress,
         uint256 _stake,
-        uint256 _minPrice,
         uint256 _maxPrice,
         bytes memory _calldata,
         bool _useKyber
@@ -688,9 +816,9 @@ contract BetokenFund is
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(
                 this.createInvestmentV2.selector,
+                _sender,
                 _tokenAddress,
                 _stake,
-                _minPrice,
                 _maxPrice,
                 _calldata,
                 _useKyber
@@ -709,21 +837,18 @@ contract BetokenFund is
      * @param _investmentId the ID of the investment
      * @param _tokenAmount the amount of tokens to be sold.
      * @param _minPrice the minimum price for the trade
-     * @param _maxPrice the maximum price for the trade
      */
     function sellInvestmentAsset(
         uint256 _investmentId,
         uint256 _tokenAmount,
-        uint256 _minPrice,
-        uint256 _maxPrice
+        uint256 _minPrice
     ) public {
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(
                 this.sellInvestmentAsset.selector,
                 _investmentId,
                 _tokenAmount,
-                _minPrice,
-                _maxPrice
+                _minPrice
             )
         );
         if (!success) {
@@ -739,23 +864,22 @@ contract BetokenFund is
      * @param _investmentId the ID of the investment
      * @param _tokenAmount the amount of tokens to be sold.
      * @param _minPrice the minimum price for the trade
-     * @param _maxPrice the maximum price for the trade
      */
     function sellInvestmentAssetV2(
+        address _sender,
         uint256 _investmentId,
         uint256 _tokenAmount,
         uint256 _minPrice,
-        uint256 _maxPrice,
         bytes memory _calldata,
         bool _useKyber
     ) public {
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(
                 this.sellInvestmentAssetV2.selector,
+                _sender,
                 _investmentId,
                 _tokenAmount,
                 _minPrice,
-                _maxPrice,
                 _calldata,
                 _useKyber
             )
@@ -774,6 +898,7 @@ contract BetokenFund is
      * @param _maxPrice the maximum token price for the trade
      */
     function createCompoundOrder(
+        address _sender,
         bool _orderType,
         address _tokenAddress,
         uint256 _stake,
@@ -783,6 +908,7 @@ contract BetokenFund is
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(
                 this.createCompoundOrder.selector,
+                _sender,
                 _orderType,
                 _tokenAddress,
                 _stake,
@@ -802,6 +928,7 @@ contract BetokenFund is
      * @param _maxPrice the maximum token price for the trade
      */
     function sellCompoundOrder(
+        address _sender,
         uint256 _orderId,
         uint256 _minPrice,
         uint256 _maxPrice
@@ -809,6 +936,7 @@ contract BetokenFund is
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(
                 this.sellCompoundOrder.selector,
+                _sender,
                 _orderId,
                 _minPrice,
                 _maxPrice
@@ -824,12 +952,15 @@ contract BetokenFund is
      * @param _orderId the ID of the Compound order
      * @param _repayAmountInDAI amount of DAI to use for repaying debt
      */
-    function repayCompoundOrder(uint256 _orderId, uint256 _repayAmountInDAI)
-        public
-    {
+    function repayCompoundOrder(
+        address _sender,
+        uint256 _orderId,
+        uint256 _repayAmountInDAI
+    ) public {
         (bool success, ) = betokenLogic.delegatecall(
             abi.encodeWithSelector(
                 this.repayCompoundOrder.selector,
+                _sender,
                 _orderId,
                 _repayAmountInDAI
             )

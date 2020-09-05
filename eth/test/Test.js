@@ -443,7 +443,7 @@
       prevFundTokenBlnce = BigNumber((await token.balanceOf(this.fund.address)));
       // buy token
       amount = NEW_MANAGER_KAIRO;
-      await this.fund.createInvestment(token.address, bnToString(amount), 0, MAX_PRICE, {
+      await this.fund.createInvestment(token.address, bnToString(amount), MAX_PRICE, {
         from: account
       });
       // check KRO balance
@@ -456,7 +456,7 @@
       assert.equal(fundTokenBlnce.minus(prevFundTokenBlnce).toNumber(), Math.floor(fundDAIBlnce.times(PRECISION).div(kroTotalSupply).times(amount).div(OMG_PRICE).toNumber()), "token balance increase incorrect");
       // create investment for account2
       account2 = accounts[2];
-      return (await this.fund.createInvestment(ETH_ADDR, bnToString(amount), 0, bnToString(ETH_PRICE * 2), {
+      return (await this.fund.createInvestment(ETH_ADDR, bnToString(amount), bnToString(ETH_PRICE * 2), {
         from: account2
       }));
     });
@@ -472,7 +472,7 @@
       prevFundBlnce = BigNumber((await this.fund.totalFundsInDAI.call()));
       // sell investment
       tokenAmount = BigNumber(((await this.fund.userInvestments.call(account, 0))).tokenAmount);
-      await this.fund.sellInvestmentAsset(0, bnToString(tokenAmount), 0, MAX_PRICE, {
+      await this.fund.sellInvestmentAsset(0, bnToString(tokenAmount), 0, {
         from: account
       });
       // check KRO balance
@@ -490,10 +490,10 @@
       await timeTravel(2 * DAY);
       tokenAmount = BigNumber(((await this.fund.userInvestments.call(account2, 0))).tokenAmount);
       // sell half of the investment, then sell the rest
-      await this.fund.sellInvestmentAsset(0, bnToString(tokenAmount.div(2)), 0, bnToString(ETH_PRICE * 2), {
+      await this.fund.sellInvestmentAsset(0, bnToString(tokenAmount.div(2)), 0, {
         from: account2
       });
-      return (await this.fund.sellInvestmentAsset(1, bnToString(tokenAmount.div(2)), 0, bnToString(ETH_PRICE * 2), {
+      return (await this.fund.sellInvestmentAsset(1, bnToString(tokenAmount.div(2)), 0, {
         from: account2
       }));
     });
@@ -509,7 +509,7 @@
       prevFundDAIBlnce = BigNumber((await dai.balanceOf.call(this.fund.address)));
       // create short order
       amount = 0.01 * PRECISION;
-      await this.fund.createCompoundOrder(true, cToken.address, bnToString(amount), 0, MAX_PRICE, {
+      await this.fund.createCompoundOrder(account, true, cToken.address, bnToString(amount), 0, MAX_PRICE, {
         from: account
       });
       shortOrder = (await CO(this.fund, account, 0));
@@ -522,7 +522,7 @@
       assert.equal(prevFundDAIBlnce.minus(fundDAIBlnce).toNumber(), (await shortOrder.collateralAmountInDAI.call()), "DAI balance decrease incorrect");
       // create long order for account2
       account2 = accounts[2];
-      return (await this.fund.createCompoundOrder(false, ((await TestCEther.deployed())).address, bnToString(amount), 0, bnToString(ETH_PRICE * 2), {
+      return (await this.fund.createCompoundOrder(account2, false, ((await TestCEther.deployed())).address, bnToString(amount), 0, bnToString(ETH_PRICE * 2), {
         from: account2
       }));
     });
@@ -539,7 +539,7 @@
       prevFundBlnce = BigNumber((await this.fund.totalFundsInDAI.call()));
       // sell short order
       shortOrder = (await CO(this.fund, account, 0));
-      await this.fund.sellCompoundOrder(0, 0, MAX_PRICE, {
+      await this.fund.sellCompoundOrder(account, 0, 0, MAX_PRICE, {
         from: account
       });
       // check KRO balance
@@ -558,7 +558,7 @@
       prevFundBlnce = BigNumber((await this.fund.totalFundsInDAI.call()));
       // sell account2's long order
       longOrder = (await CO(this.fund, account2, 0));
-      await this.fund.sellCompoundOrder(0, 0, bnToString(ETH_PRICE * 2), {
+      await this.fund.sellCompoundOrder(account2, 0, 0, bnToString(ETH_PRICE * 2), {
         from: account2
       });
       // check KRO balance
@@ -721,17 +721,17 @@
       // invest in asset
       stake = 0.1 * PRECISION;
       investmentId = 0;
-      await this.fund.createInvestment(omg.address, bnToString(stake), 0, MAX_PRICE, {
+      await this.fund.createInvestment(omg.address, bnToString(stake), MAX_PRICE, {
         from: account
       });
       // create short order
       shortId = 0;
-      await this.fund.createCompoundOrder(true, cOMG.address, bnToString(stake), 0, MAX_PRICE, {
+      await this.fund.createCompoundOrder(account, true, cOMG.address, bnToString(stake), 0, MAX_PRICE, {
         from: account
       });
       // create long order
       longId = 1;
-      await this.fund.createCompoundOrder(false, cOMG.address, bnToString(stake), 0, MAX_PRICE, {
+      await this.fund.createCompoundOrder(account, false, cOMG.address, bnToString(stake), 0, MAX_PRICE, {
         from: account
       });
       // raise asset price by 20%
@@ -747,7 +747,7 @@
       prevKROBlnce = BigNumber((await kro.balanceOf.call(account)));
       prevFundBlnce = BigNumber((await this.fund.totalFundsInDAI.call()));
       tokenAmount = BigNumber(((await this.fund.userInvestments.call(account, investmentId))).tokenAmount);
-      await this.fund.sellInvestmentAsset(investmentId, tokenAmount, 0, MAX_PRICE, {
+      await this.fund.sellInvestmentAsset(investmentId, tokenAmount, 0, {
         from: account
       });
       // check KRO reward
@@ -760,7 +760,7 @@
       // sell short order
       prevKROBlnce = BigNumber((await kro.balanceOf.call(account)));
       prevFundBlnce = BigNumber((await this.fund.totalFundsInDAI.call()));
-      await this.fund.sellCompoundOrder(shortId, 0, MAX_PRICE, {
+      await this.fund.sellCompoundOrder(account, shortId, 0, MAX_PRICE, {
         from: account
       });
       // check KRO penalty
@@ -773,7 +773,7 @@
       // sell long order
       prevKROBlnce = BigNumber((await kro.balanceOf.call(account)));
       prevFundBlnce = BigNumber((await this.fund.totalFundsInDAI.call()));
-      await this.fund.sellCompoundOrder(longId, 0, MAX_PRICE, {
+      await this.fund.sellCompoundOrder(account, longId, 0, MAX_PRICE, {
         from: account
       });
       // check KRO reward
@@ -802,17 +802,17 @@
       // invest in asset
       stake = 0.1 * PRECISION;
       investmentId = 1;
-      await this.fund.createInvestment(omg.address, bnToString(stake), 0, MAX_PRICE, {
+      await this.fund.createInvestment(omg.address, bnToString(stake), MAX_PRICE, {
         from: account
       });
       // create short order
       shortId = 2;
-      await this.fund.createCompoundOrder(true, cOMG.address, bnToString(stake), 0, MAX_PRICE, {
+      await this.fund.createCompoundOrder(account, true, cOMG.address, bnToString(stake), 0, MAX_PRICE, {
         from: account
       });
       // create long order
       longId = 3;
-      await this.fund.createCompoundOrder(false, cOMG.address, bnToString(stake), 0, MAX_PRICE, {
+      await this.fund.createCompoundOrder(account, false, cOMG.address, bnToString(stake), 0, MAX_PRICE, {
         from: account
       });
       // lower asset price by 20%
@@ -828,7 +828,7 @@
       prevKROBlnce = BigNumber((await kro.balanceOf.call(account)));
       prevFundBlnce = BigNumber((await this.fund.totalFundsInDAI.call()));
       tokenAmount = BigNumber(((await this.fund.userInvestments.call(account, investmentId))).tokenAmount);
-      await this.fund.sellInvestmentAsset(investmentId, tokenAmount, 0, MAX_PRICE, {
+      await this.fund.sellInvestmentAsset(investmentId, tokenAmount, 0, {
         from: account
       });
       // check KRO penalty
@@ -841,7 +841,7 @@
       // sell short order
       prevKROBlnce = BigNumber((await kro.balanceOf.call(account)));
       prevFundBlnce = BigNumber((await this.fund.totalFundsInDAI.call()));
-      await this.fund.sellCompoundOrder(shortId, 0, MAX_PRICE, {
+      await this.fund.sellCompoundOrder(account, shortId, 0, MAX_PRICE, {
         from: account
       });
       // check KRO reward
@@ -854,7 +854,7 @@
       // sell long order
       prevKROBlnce = BigNumber((await kro.balanceOf.call(account)));
       prevFundBlnce = BigNumber((await this.fund.totalFundsInDAI.call()));
-      await this.fund.sellCompoundOrder(longId, 0, MAX_PRICE, {
+      await this.fund.sellCompoundOrder(account, longId, 0, MAX_PRICE, {
         from: account
       });
       // check KRO penalty
@@ -883,7 +883,7 @@
       // invest in asset
       stake = 0.1 * PRECISION;
       investmentId = 2;
-      await this.fund.createInvestment(omg.address, bnToString(stake), 0, MAX_PRICE, {
+      await this.fund.createInvestment(omg.address, bnToString(stake), MAX_PRICE, {
         from: account
       });
       // lower asset price by 99.99%
@@ -898,7 +898,7 @@
       // sell asset
       prevKROBlnce = BigNumber((await kro.balanceOf.call(account)));
       tokenAmount = BigNumber(((await this.fund.userInvestments.call(account, investmentId))).tokenAmount);
-      await this.fund.sellInvestmentAsset(investmentId, tokenAmount, 0, MAX_PRICE, {
+      await this.fund.sellInvestmentAsset(investmentId, tokenAmount, 0, {
         from: account
       });
       // check KRO penalty

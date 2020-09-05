@@ -167,6 +167,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
     PeakReward public peakReward;
     PeakStaking public peakStaking;
     bool public isPermissioned;
+    mapping(address => mapping(uint256 => bool)) public hasUsedSalt;
 
     // Events
 
