@@ -1,15 +1,15 @@
 pragma solidity 0.5.17;
 
 import "@openzeppelin/contracts/cryptography/ECDSA.sol";
-import "./BetokenStorage.sol";
+import "./PeakDeFiStorage.sol";
 import "./derivatives/CompoundOrderFactory.sol";
 
 /**
- * @title Part of the functions for BetokenFund
+ * @title Part of the functions for PeakDeFiFund
  * @author Zefram Lou (Zebang Liu)
  */
-contract BetokenLogic is
-    BetokenStorage,
+contract PeakDeFiLogic is
+    PeakDeFiStorage,
     Utils(address(0), address(0), address(0))
 {
     /**
@@ -37,8 +37,8 @@ contract BetokenLogic is
     }
 
     /**
-     * @notice Burns the Kairo balance of a manager who has been inactive for a certain number of cycles
-     * @param _deadman the manager whose Kairo balance will be burned
+     * @notice Burns the RepToken balance of a manager who has been inactive for a certain number of cycles
+     * @param _deadman the manager whose RepToken balance will be burned
      */
     function burnDeadman(address _deadman)
         public
@@ -57,7 +57,7 @@ contract BetokenLogic is
     /**
      * @notice Creates a new investment for an ERC20 token. Backwards compatible.
      * @param _tokenAddress address of the ERC20 token contract
-     * @param _stake amount of Kairos to be staked in support of the investment
+     * @param _stake amount of RepTokens to be staked in support of the investment
      * @param _maxPrice the maximum price for the trade
      */
     function createInvestment(
@@ -120,7 +120,7 @@ contract BetokenLogic is
     }
 
     /**
-     * @notice Called by user to sell the assets an investment invested in. Returns the staked Kairo plus rewards/penalties to the user.
+     * @notice Called by user to sell the assets an investment invested in. Returns the staked RepToken plus rewards/penalties to the user.
      *         The user can sell only part of the investment by changing _tokenAmount. Backwards compatible.
      * @dev When selling only part of an investment, the old investment would be "fully" sold and a new investment would be created with
      *   the original buy price and however much tokens that are not sold.
@@ -190,7 +190,7 @@ contract BetokenLogic is
     /**
      * @notice Creates a new investment for an ERC20 token.
      * @param _tokenAddress address of the ERC20 token contract
-     * @param _stake amount of Kairos to be staked in support of the investment
+     * @param _stake amount of RepTokens to be staked in support of the investment
      * @param _maxPrice the maximum price for the trade
      * @param _calldata calldata for 1inch trading
      * @param _useKyber true for Kyber Network, false for 1inch
@@ -230,7 +230,7 @@ contract BetokenLogic is
                 buyPrice: 0,
                 sellPrice: 0,
                 buyTime: now,
-                buyCostInDAI: 0,
+                buyCostInUSDC: 0,
                 isSold: false
             })
         );
@@ -255,7 +255,7 @@ contract BetokenLogic is
     }
 
     /**
-     * @notice Called by user to sell the assets an investment invested in. Returns the staked Kairo plus rewards/penalties to the user.
+     * @notice Called by user to sell the assets an investment invested in. Returns the staked RepToken plus rewards/penalties to the user.
      *         The user can sell only part of the investment by changing _tokenAmount.
      * @dev When selling only part of an investment, the old investment would be "fully" sold and a new investment would be created with
      *   the original buy price and however much tokens that are not sold.
@@ -333,19 +333,19 @@ contract BetokenLogic is
     ) internal {
         Investment storage investment = userInvestments[_sender][_investmentId];
 
-        // Return staked Kairo
-        uint256 receiveKairoAmount = getReceiveKairoAmount(
+        // Return staked RepToken
+        uint256 receiveRepTokenAmount = getReceiveRepTokenAmount(
             stakeOfSoldTokens,
             investment.sellPrice,
             investment.buyPrice
         );
-        __returnStake(receiveKairoAmount, stakeOfSoldTokens);
+        __returnStake(receiveRepTokenAmount, stakeOfSoldTokens);
 
         // Record risk taken in investment
         __recordRisk(_sender, investment.stake, investment.buyTime);
 
         // Update total funds
-        totalFundsInDAI = totalFundsInDAI.sub(investment.buyCostInDAI).add(
+        totalFundsInUSDC = totalFundsInUSDC.sub(investment.buyCostInUSDC).add(
             actualDestAmount
         );
 
@@ -353,7 +353,7 @@ contract BetokenLogic is
         __emitSoldInvestmentEvent(
             _sender,
             _investmentId,
-            receiveKairoAmount,
+            receiveRepTokenAmount,
             actualDestAmount
         );
     }
@@ -361,7 +361,7 @@ contract BetokenLogic is
     function __emitSoldInvestmentEvent(
         address _sender,
         uint256 _investmentId,
-        uint256 _receiveKairoAmount,
+        uint256 _receiveRepTokenAmount,
         uint256 _actualDestAmount
     ) internal {
         Investment storage investment = userInvestments[_sender][_investmentId];
@@ -370,7 +370,7 @@ contract BetokenLogic is
             _sender,
             _investmentId,
             investment.tokenAddress,
-            _receiveKairoAmount,
+            _receiveRepTokenAmount,
             investment.sellPrice,
             _actualDestAmount
         );
@@ -387,9 +387,9 @@ contract BetokenLogic is
             investment.tokenAmount
         );
 
-        // calculate the part of original DAI cost attributed to the sold tokens
-        uint256 soldBuyCostInDAI = investment
-            .buyCostInDAI
+        // calculate the part of original USDC cost attributed to the sold tokens
+        uint256 soldBuyCostInUSDC = investment
+            .buyCostInUSDC
             .mul(_tokenAmount)
             .div(investment.tokenAmount);
 
@@ -402,7 +402,7 @@ contract BetokenLogic is
                 buyPrice: investment.buyPrice,
                 sellPrice: 0,
                 buyTime: investment.buyTime,
-                buyCostInDAI: investment.buyCostInDAI.sub(soldBuyCostInDAI),
+                buyCostInUSDC: investment.buyCostInUSDC.sub(soldBuyCostInUSDC),
                 isSold: false
             })
         );
@@ -410,7 +410,7 @@ contract BetokenLogic is
         // update the investment object being sold
         investment.tokenAmount = _tokenAmount;
         investment.stake = stakeOfSoldTokens;
-        investment.buyCostInDAI = soldBuyCostInDAI;
+        investment.buyCostInUSDC = soldBuyCostInUSDC;
     }
 
     function __emitCreatedInvestmentEvent(address _sender, uint256 _id)
@@ -424,7 +424,7 @@ contract BetokenLogic is
             investment.tokenAddress,
             investment.stake,
             investment.buyPrice,
-            investment.buyCostInDAI,
+            investment.buyCostInUSDC,
             investment.tokenAmount
         );
     }
@@ -502,7 +502,7 @@ contract BetokenLogic is
 
     function repayCompoundOrderWithSignature(
         uint256 _orderId,
-        uint256 _repayAmountInDAI,
+        uint256 _repayAmountInUSDC,
         address _manager,
         uint256 _salt,
         bytes calldata _signature
@@ -511,7 +511,7 @@ contract BetokenLogic is
         bytes32 naiveHash = keccak256(
             abi.encodeWithSelector(
                 this.repayCompoundOrderWithSignature.selector,
-                abi.encode(_orderId, _repayAmountInDAI),
+                abi.encode(_orderId, _repayAmountInUSDC),
                 "|END|",
                 _salt,
                 address(this)
@@ -524,14 +524,14 @@ contract BetokenLogic is
         // Signature valid, record use of salt
         hasUsedSalt[_manager][_salt] = true;
 
-        repayCompoundOrder(_manager, _orderId, _repayAmountInDAI);
+        repayCompoundOrder(_manager, _orderId, _repayAmountInUSDC);
     }
 
     /**
      * @notice Creates a new Compound order to either short or leverage long a token.
      * @param _orderType true for a short order, false for a levarage long order
      * @param _tokenAddress address of the Compound token to be traded
-     * @param _stake amount of Kairos to be staked
+     * @param _stake amount of RepTokens to be staked
      * @param _minPrice the minimum token price for the trade
      * @param _maxPrice the maximum token price for the trade
      */
@@ -562,17 +562,17 @@ contract BetokenLogic is
         require(cToken.destroyTokens(_sender, _stake));
 
         // Create compound order and execute
-        uint256 collateralAmountInDAI = totalFundsInDAI.mul(_stake).div(
+        uint256 collateralAmountInUSDC = totalFundsInUSDC.mul(_stake).div(
             cToken.totalSupply()
         );
         CompoundOrder order = __createCompoundOrder(
             _orderType,
             _tokenAddress,
             _stake,
-            collateralAmountInDAI
+            collateralAmountInUSDC
         );
-        dai.safeApprove(address(order), 0);
-        dai.safeApprove(address(order), collateralAmountInDAI);
+        usdc.safeApprove(address(order), 0);
+        usdc.safeApprove(address(order), collateralAmountInUSDC);
         order.executeOrder(_minPrice, _maxPrice);
 
         // Add order to list
@@ -587,7 +587,7 @@ contract BetokenLogic is
             _orderType,
             _tokenAddress,
             _stake,
-            collateralAmountInDAI
+            collateralAmountInUSDC
         );
     }
 
@@ -597,7 +597,7 @@ contract BetokenLogic is
         bool _orderType,
         address _tokenAddress,
         uint256 _stake,
-        uint256 collateralAmountInDAI
+        uint256 collateralAmountInUSDC
     ) internal {
         // Emit event
         emit CreatedCompoundOrder(
@@ -608,7 +608,7 @@ contract BetokenLogic is
             _orderType,
             _tokenAddress,
             _stake,
-            collateralAmountInDAI
+            collateralAmountInUSDC
         );
     }
 
@@ -638,20 +638,20 @@ contract BetokenLogic is
             _maxPrice
         );
 
-        // Return staked Kairo
+        // Return staked RepToken
         uint256 stake = order.stake();
-        uint256 receiveKairoAmount = getReceiveKairoAmount(
+        uint256 receiveRepTokenAmount = getReceiveRepTokenAmount(
             stake,
             outputAmount,
             inputAmount
         );
-        __returnStake(receiveKairoAmount, stake);
+        __returnStake(receiveRepTokenAmount, stake);
 
         // Record risk taken
         __recordRisk(_sender, stake, order.buyTime());
 
         // Update total funds
-        totalFundsInDAI = totalFundsInDAI.sub(inputAmount).add(outputAmount);
+        totalFundsInUSDC = totalFundsInUSDC.sub(inputAmount).add(outputAmount);
 
         // Emit event
         emit SoldCompoundOrder(
@@ -661,7 +661,7 @@ contract BetokenLogic is
             address(order),
             order.orderType(),
             order.compoundTokenAddr(),
-            receiveKairoAmount,
+            receiveRepTokenAmount,
             outputAmount
         );
     }
@@ -669,12 +669,12 @@ contract BetokenLogic is
     /**
      * @notice Repys debt for a Compound order to prevent the collateral ratio from dropping below threshold.
      * @param _orderId the ID of the Compound order
-     * @param _repayAmountInDAI amount of DAI to use for repaying debt
+     * @param _repayAmountInUSDC amount of USDC to use for repaying debt
      */
     function repayCompoundOrder(
         address _sender,
         uint256 _orderId,
-        uint256 _repayAmountInDAI
+        uint256 _repayAmountInUSDC
     ) public during(CyclePhase.Manage) nonReentrant {
         require(msg.sender == _sender || msg.sender == address(this));
         // Load order info
@@ -685,7 +685,7 @@ contract BetokenLogic is
         require(order.isSold() == false && order.cycleNumber() == cycleNumber);
 
         // Repay loan
-        order.repayLoan(_repayAmountInDAI);
+        order.repayLoan(_repayAmountInUSDC);
 
         // Emit event
         emit RepaidCompoundOrder(
@@ -693,11 +693,11 @@ contract BetokenLogic is
             _sender,
             userCompoundOrders[_sender].length - 1,
             address(order),
-            _repayAmountInDAI
+            _repayAmountInUSDC
         );
     }
 
-    function getReceiveKairoAmount(
+    function getReceiveRepTokenAmount(
         uint256 stake,
         uint256 output,
         uint256 input
@@ -764,8 +764,8 @@ contract BetokenLogic is
                     _actualDestAmount,
                     _actualSrcAmount
                 ) = __kyberTrade(
-                    dai,
-                    totalFundsInDAI.mul(investment.stake).div(
+                    usdc,
+                    totalFundsInUSDC.mul(investment.stake).div(
                         cToken.totalSupply()
                     ),
                     ERC20Detailed(token)
@@ -778,8 +778,8 @@ contract BetokenLogic is
                     _actualDestAmount,
                     _actualSrcAmount
                 ) = __oneInchTrade(
-                    dai,
-                    totalFundsInDAI.mul(investment.stake).div(
+                    usdc,
+                    totalFundsInUSDC.mul(investment.stake).div(
                         cToken.totalSupply()
                     ),
                     ERC20Detailed(token),
@@ -789,7 +789,7 @@ contract BetokenLogic is
             require(_minPrice <= dInS && dInS <= _maxPrice);
             investment.buyPrice = dInS;
             investment.tokenAmount = _actualDestAmount;
-            investment.buyCostInDAI = _actualSrcAmount;
+            investment.buyCostInUSDC = _actualSrcAmount;
         } else {
             if (_useKyber) {
                 (
@@ -800,7 +800,7 @@ contract BetokenLogic is
                 ) = __kyberTrade(
                     ERC20Detailed(token),
                     investment.tokenAmount,
-                    dai
+                    usdc
                 );
             } else {
                 (
@@ -811,7 +811,7 @@ contract BetokenLogic is
                 ) = __oneInchTrade(
                     ERC20Detailed(token),
                     investment.tokenAmount,
-                    dai,
+                    usdc,
                     _calldata
                 );
             }
@@ -828,12 +828,12 @@ contract BetokenLogic is
         bool _orderType, // True for shorting, false for longing
         address _tokenAddress,
         uint256 _stake,
-        uint256 _collateralAmountInDAI
+        uint256 _collateralAmountInUSDC
     ) internal returns (CompoundOrder) {
         CompoundOrderFactory factory = CompoundOrderFactory(
             compoundFactoryAddr
         );
-        uint256 loanAmountInDAI = _collateralAmountInDAI
+        uint256 loanAmountInUSDC = _collateralAmountInUSDC
             .mul(COLLATERAL_RATIO_MODIFIER)
             .div(PRECISION)
             .mul(factory.getMarketCollateralFactor(_tokenAddress))
@@ -842,8 +842,8 @@ contract BetokenLogic is
             _tokenAddress,
             cycleNumber,
             _stake,
-            _collateralAmountInDAI,
-            loanAmountInDAI,
+            _collateralAmountInUSDC,
+            loanAmountInUSDC,
             _orderType
         );
         return order;
@@ -852,11 +852,11 @@ contract BetokenLogic is
     /**
      * @notice Returns stake to manager after investment is sold, including reward/penalty based on performance
      */
-    function __returnStake(uint256 _receiveKairoAmount, uint256 _stake)
+    function __returnStake(uint256 _receiveRepTokenAmount, uint256 _stake)
         internal
     {
         require(cToken.destroyTokens(address(this), _stake));
-        require(cToken.generateTokens(msg.sender, _receiveKairoAmount));
+        require(cToken.generateTokens(msg.sender, _receiveRepTokenAmount));
     }
 
     /**

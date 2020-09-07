@@ -25,7 +25,7 @@ Under `eth/`, run
 npx buidler run scripts/deploy-oracle.js --network mainnet
 ```
 
-## 2. Deploy BetokenFactory
+## 2. Deploy PeakDeFiFactory
 
 ### Precondition
 
@@ -47,7 +47,7 @@ Give `PeakStaking` and `PeakReward` the minter role in the MarketPeak token cont
 
 The deployer address now has the signer role in `PeakReward`, meaning it can initialize the referral structure. Call `PeakReward.register()` for each referral pair. Call `PeakReward.renounceSignerRole()` to give up the right to do so after initialization.
 
-## 3. Deploy BetokenFund
+## 3. Deploy PeakDeFiFund
 
 ### Precondition
 
@@ -65,4 +65,4 @@ npx buidler run scripts/deploy-mainnet-fund.js --network mainnet
 
 ### Things to do after
 
-The deployer account now has ownership of `BetokenFund`, which gives admin rights. Transfer the ownership to your desired account.
+The deployer account now has ownership of `PeakDeFiFund`, which gives admin rights. Transfer the ownership to your desired account.

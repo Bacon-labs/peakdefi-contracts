@@ -9,7 +9,7 @@ import "../Utils.sol";
 
 contract CompoundOrder is Utils(address(0), address(0), address(0)), Ownable {
   // Constants
-  uint256 internal constant NEGLIGIBLE_DEBT = 10 ** 14; // we don't care about debts below 10^-4 DAI (0.1 cent)
+  uint256 internal constant NEGLIGIBLE_DEBT = 10 ** 14; // we don't care about debts below 10^-4 USDC (0.1 cent)
   uint256 internal constant MAX_REPAY_STEPS = 3; // Max number of times we attempt to repay remaining debt
   uint256 internal constant DEFAULT_LIQUIDITY_SLIPPAGE = 10 ** 12; // 1e-6 slippage for redeeming liquidity when selling order
   uint256 internal constant FALLBACK_LIQUIDITY_SLIPPAGE = 10 ** 15; // 0.1% slippage for redeeming liquidity when selling order
@@ -18,16 +18,16 @@ contract CompoundOrder is Utils(address(0), address(0), address(0)), Ownable {
   // Contract instances
   Comptroller public COMPTROLLER; // The Compound comptroller
   PriceOracle public ORACLE; // The Compound price oracle
-  CERC20 public CDAI; // The Compound DAI market token
+  CERC20 public CUSDC; // The Compound USDC market token
   address public CETH_ADDR;
 
   // Instance variables
   uint256 public stake;
-  uint256 public collateralAmountInDAI;
-  uint256 public loanAmountInDAI;
+  uint256 public collateralAmountInUSDC;
+  uint256 public loanAmountInUSDC;
   uint256 public cycleNumber;
   uint256 public buyTime; // Timestamp for order execution
-  uint256 public outputAmount; // Records the total output DAI after order is sold
+  uint256 public outputAmount; // Records the total output USDC after order is sold
   address public compoundTokenAddr;
   bool public isSold;
   bool public orderType; // True for shorting, false for longing
@@ -40,36 +40,36 @@ contract CompoundOrder is Utils(address(0), address(0), address(0)), Ownable {
     address _compoundTokenAddr,
     uint256 _cycleNumber,
     uint256 _stake,
-    uint256 _collateralAmountInDAI,
-    uint256 _loanAmountInDAI,
+    uint256 _collateralAmountInUSDC,
+    uint256 _loanAmountInUSDC,
     bool _orderType,
-    address _daiAddr,
+    address _usdcAddr,
     address payable _kyberAddr,
     address _comptrollerAddr,
     address _priceOracleAddr,
-    address _cDAIAddr,
+    address _cUSDCAddr,
     address _cETHAddr
   ) public {
     require(!initialized);
     initialized = true;
     
     // Initialize details of order
-    require(_compoundTokenAddr != _cDAIAddr);
-    require(_stake > 0 && _collateralAmountInDAI > 0 && _loanAmountInDAI > 0); // Validate inputs
+    require(_compoundTokenAddr != _cUSDCAddr);
+    require(_stake > 0 && _collateralAmountInUSDC > 0 && _loanAmountInUSDC > 0); // Validate inputs
     stake = _stake;
-    collateralAmountInDAI = _collateralAmountInDAI;
-    loanAmountInDAI = _loanAmountInDAI;
+    collateralAmountInUSDC = _collateralAmountInUSDC;
+    loanAmountInUSDC = _loanAmountInUSDC;
     cycleNumber = _cycleNumber;
     compoundTokenAddr = _compoundTokenAddr;
     orderType = _orderType;
 
     COMPTROLLER = Comptroller(_comptrollerAddr);
     ORACLE = PriceOracle(_priceOracleAddr);
-    CDAI = CERC20(_cDAIAddr);
+    CUSDC = CERC20(_cUSDCAddr);
     CETH_ADDR = _cETHAddr;
-    DAI_ADDR = _daiAddr;
+    USDC_ADDR = _usdcAddr;
     KYBER_ADDR = _kyberAddr;
-    dai = ERC20Detailed(_daiAddr);
+    usdc = ERC20Detailed(_usdcAddr);
     kyber = KyberNetwork(_kyberAddr);
 
     // transfer ownership to msg.sender
@@ -84,7 +84,7 @@ contract CompoundOrder is Utils(address(0), address(0), address(0)), Ownable {
   function executeOrder(uint256 _minPrice, uint256 _maxPrice) public;
 
   /**
-   * @notice Sells the Compound order and returns assets to BetokenFund
+   * @notice Sells the Compound order and returns assets to PeakDeFiFund
    * @param _minPrice the minimum token price
    * @param _maxPrice the maximum token price
    */
@@ -92,38 +92,38 @@ contract CompoundOrder is Utils(address(0), address(0), address(0)), Ownable {
 
   /**
    * @notice Repays the loans taken out to prevent the collateral ratio from dropping below threshold
-   * @param _repayAmountInDAI the amount to repay, in DAI
+   * @param _repayAmountInUSDC the amount to repay, in USDC
    */
-  function repayLoan(uint256 _repayAmountInDAI) public;
+  function repayLoan(uint256 _repayAmountInUSDC) public;
 
   function getMarketCollateralFactor() public view returns (uint256);
 
-  function getCurrentCollateralInDAI() public returns (uint256 _amount);
+  function getCurrentCollateralInUSDC() public returns (uint256 _amount);
 
-  function getCurrentBorrowInDAI() public returns (uint256 _amount);
+  function getCurrentBorrowInUSDC() public returns (uint256 _amount);
 
-  function getCurrentCashInDAI() public view returns (uint256 _amount);
+  function getCurrentCashInUSDC() public view returns (uint256 _amount);
 
   /**
-   * @notice Calculates the current profit in DAI
+   * @notice Calculates the current profit in USDC
    * @return the profit amount
    */
-  function getCurrentProfitInDAI() public returns (bool _isNegative, uint256 _amount) {
+  function getCurrentProfitInUSDC() public returns (bool _isNegative, uint256 _amount) {
     uint256 l;
     uint256 r;
     if (isSold) {
       l = outputAmount;
-      r = collateralAmountInDAI;
+      r = collateralAmountInUSDC;
     } else {
-      uint256 cash = getCurrentCashInDAI();
-      uint256 supply = getCurrentCollateralInDAI();
-      uint256 borrow = getCurrentBorrowInDAI();
+      uint256 cash = getCurrentCashInUSDC();
+      uint256 supply = getCurrentCollateralInUSDC();
+      uint256 borrow = getCurrentBorrowInUSDC();
       if (cash >= borrow) {
         l = supply.add(cash);
-        r = borrow.add(collateralAmountInDAI);
+        r = borrow.add(collateralAmountInUSDC);
       } else {
         l = supply;
-        r = borrow.sub(cash).mul(PRECISION).div(getMarketCollateralFactor()).add(collateralAmountInDAI);
+        r = borrow.sub(cash).mul(PRECISION).div(getMarketCollateralFactor()).add(collateralAmountInUSDC);
       }
     }
     
@@ -138,9 +138,9 @@ contract CompoundOrder is Utils(address(0), address(0), address(0)), Ownable {
    * @notice Calculates the current collateral ratio on Compound, using 18 decimals
    * @return the collateral ratio
    */
-  function getCurrentCollateralRatioInDAI() public returns (uint256 _amount) {
-    uint256 supply = getCurrentCollateralInDAI();
-    uint256 borrow = getCurrentBorrowInDAI();
+  function getCurrentCollateralRatioInUSDC() public returns (uint256 _amount) {
+    uint256 supply = getCurrentCollateralInUSDC();
+    uint256 borrow = getCurrentBorrowInUSDC();
     if (borrow == 0) {
       return uint256(-1);
     }
@@ -151,9 +151,9 @@ contract CompoundOrder is Utils(address(0), address(0), address(0)), Ownable {
    * @notice Calculates the current liquidity (supply - collateral) on the Compound platform
    * @return the liquidity
    */
-  function getCurrentLiquidityInDAI() public returns (bool _isNegative, uint256 _amount) {
-    uint256 supply = getCurrentCollateralInDAI();
-    uint256 borrow = getCurrentBorrowInDAI().mul(PRECISION).div(getMarketCollateralFactor());
+  function getCurrentLiquidityInUSDC() public returns (bool _isNegative, uint256 _amount) {
+    uint256 supply = getCurrentCollateralInUSDC();
+    uint256 borrow = getCurrentBorrowInUSDC().mul(PRECISION).div(getMarketCollateralFactor());
     if (supply >= borrow) {
       return (false, supply.sub(borrow));
     } else {
@@ -161,36 +161,36 @@ contract CompoundOrder is Utils(address(0), address(0), address(0)), Ownable {
     }
   }
 
-  function __sellDAIForToken(uint256 _daiAmount) internal returns (uint256 _actualDAIAmount, uint256 _actualTokenAmount) {
+  function __sellUSDCForToken(uint256 _usdcAmount) internal returns (uint256 _actualUSDCAmount, uint256 _actualTokenAmount) {
     ERC20Detailed t = __underlyingToken(compoundTokenAddr);
-    (,, _actualTokenAmount, _actualDAIAmount) = __kyberTrade(dai, _daiAmount, t); // Sell DAI for tokens on Kyber
-    require(_actualDAIAmount > 0 && _actualTokenAmount > 0); // Validate return values
+    (,, _actualTokenAmount, _actualUSDCAmount) = __kyberTrade(usdc, _usdcAmount, t); // Sell USDC for tokens on Kyber
+    require(_actualUSDCAmount > 0 && _actualTokenAmount > 0); // Validate return values
   }
 
-  function __sellTokenForDAI(uint256 _tokenAmount) internal returns (uint256 _actualDAIAmount, uint256 _actualTokenAmount) {
+  function __sellTokenForUSDC(uint256 _tokenAmount) internal returns (uint256 _actualUSDCAmount, uint256 _actualTokenAmount) {
     ERC20Detailed t = __underlyingToken(compoundTokenAddr);
-    (,, _actualDAIAmount, _actualTokenAmount) = __kyberTrade(t, _tokenAmount, dai); // Sell tokens for DAI on Kyber
-    require(_actualDAIAmount > 0 && _actualTokenAmount > 0); // Validate return values
+    (,, _actualUSDCAmount, _actualTokenAmount) = __kyberTrade(t, _tokenAmount, usdc); // Sell tokens for USDC on Kyber
+    require(_actualUSDCAmount > 0 && _actualTokenAmount > 0); // Validate return values
   }
 
-  // Convert a DAI amount to the amount of a given token that's of equal value
-  function __daiToToken(address _cToken, uint256 _daiAmount) internal view returns (uint256) {
+  // Convert a USDC amount to the amount of a given token that's of equal value
+  function __usdcToToken(address _cToken, uint256 _usdcAmount) internal view returns (uint256) {
     if (_cToken == CETH_ADDR) {
       // token is ETH
-      return _daiAmount.mul(ORACLE.getUnderlyingPrice(address(CDAI))).div(PRECISION);
+      return _usdcAmount.mul(ORACLE.getUnderlyingPrice(address(CUSDC))).div(PRECISION);
     }
     ERC20Detailed t = __underlyingToken(_cToken);
-    return _daiAmount.mul(ORACLE.getUnderlyingPrice(address(CDAI))).mul(10 ** getDecimals(t)).div(ORACLE.getUnderlyingPrice(_cToken).mul(PRECISION));
+    return _usdcAmount.mul(ORACLE.getUnderlyingPrice(address(CUSDC))).mul(10 ** getDecimals(t)).div(ORACLE.getUnderlyingPrice(_cToken).mul(PRECISION));
   }
 
-  // Convert a compound token amount to the amount of DAI that's of equal value
-  function __tokenToDAI(address _cToken, uint256 _tokenAmount) internal view returns (uint256) {
+  // Convert a compound token amount to the amount of USDC that's of equal value
+  function __tokenToUSDC(address _cToken, uint256 _tokenAmount) internal view returns (uint256) {
     if (_cToken == CETH_ADDR) {
       // token is ETH
-      return _tokenAmount.mul(PRECISION).div(ORACLE.getUnderlyingPrice(address(CDAI)));
+      return _tokenAmount.mul(PRECISION).div(ORACLE.getUnderlyingPrice(address(CUSDC)));
     }
     ERC20Detailed t = __underlyingToken(_cToken);
-    return _tokenAmount.mul(ORACLE.getUnderlyingPrice(_cToken)).mul(PRECISION).div(ORACLE.getUnderlyingPrice(address(CDAI)).mul(10 ** uint256(t.decimals())));
+    return _tokenAmount.mul(ORACLE.getUnderlyingPrice(_cToken)).mul(PRECISION).div(ORACLE.getUnderlyingPrice(address(CUSDC)).mul(10 ** uint256(t.decimals())));
   }
 
   function __underlyingToken(address _cToken) internal view returns (ERC20Detailed) {

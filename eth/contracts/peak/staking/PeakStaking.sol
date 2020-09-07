@@ -25,8 +25,8 @@ contract PeakStaking {
     uint256 internal constant INTEREST_SLOPE = 2 * (10**8); // Interest rate factor drops to 0 at 5B mintedPeakTokens
     uint256 internal constant BIGGER_BONUS_DIVISOR = 10**15; // biggerBonus = stakeAmount / (10 million peak)
     uint256 internal constant MAX_BIGGER_BONUS = 10**17; // biggerBonus <= 10%
-    uint256 internal constant DAILY_BASE_REWARD = 15 * (10**14); // dailyBaseReward = 0.0015
-    uint256 internal constant DAILY_GROWING_REWARD = 10**12; // dailyGrowingReward = 1e-6
+    uint256 internal constant USDCLY_BASE_REWARD = 15 * (10**14); // usdclyBaseReward = 0.0015
+    uint256 internal constant USDCLY_GROWING_REWARD = 10**12; // usdclyGrowingReward = 1e-6
     uint256 internal constant MAX_STAKE_PERIOD = 1000; // Max staking time is 1000 days
     uint256 internal constant MIN_STAKE_PERIOD = 10; // Min staking time is 10 days
     uint256 internal constant DAY_IN_SECONDS = 86400;
@@ -226,8 +226,8 @@ contract PeakStaking {
         returns (uint256)
     {
         return
-            DAILY_BASE_REWARD.mul(stakeTimeInDays).add(
-                DAILY_GROWING_REWARD
+            USDCLY_BASE_REWARD.mul(stakeTimeInDays).add(
+                USDCLY_GROWING_REWARD
                     .mul(stakeTimeInDays)
                     .mul(stakeTimeInDays.add(1))
                     .div(2)

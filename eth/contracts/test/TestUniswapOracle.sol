@@ -10,6 +10,6 @@ contract TestUniswapOracle {
         view
         returns (uint256 amountOut)
     {
-        return 12 * 10**16; // 1 PEAK = 0.12 DAI
+        return 12 * 10**16; // 1 PEAK = 0.12 USDC
     }
 }

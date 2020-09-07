@@ -99,26 +99,26 @@ contract PeakReward is SignerRole {
 
         // initialize rank rewards
         for (uint256 i = 0; i < 8; i = i.add(1)) {
-            uint256 rewardInDAI = 0;
+            uint256 rewardInUSDC = 0;
             for (uint256 j = i.add(1); j <= 8; j = j.add(1)) {
                 if (j == 1) {
-                    rewardInDAI = rewardInDAI.add(PRECISION.mul(100));
+                    rewardInUSDC = rewardInUSDC.add(PRECISION.mul(100));
                 } else if (j == 2) {
-                    rewardInDAI = rewardInDAI.add(PRECISION.mul(200));
+                    rewardInUSDC = rewardInUSDC.add(PRECISION.mul(200));
                 } else if (j == 3) {
-                    rewardInDAI = rewardInDAI.add(PRECISION.mul(400));
+                    rewardInUSDC = rewardInUSDC.add(PRECISION.mul(400));
                 } else if (j == 4) {
-                    rewardInDAI = rewardInDAI.add(PRECISION.mul(800));
+                    rewardInUSDC = rewardInUSDC.add(PRECISION.mul(800));
                 } else if (j == 5) {
-                    rewardInDAI = rewardInDAI.add(PRECISION.mul(1600));
+                    rewardInUSDC = rewardInUSDC.add(PRECISION.mul(1600));
                 } else if (j == 6) {
-                    rewardInDAI = rewardInDAI.add(PRECISION.mul(5000));
+                    rewardInUSDC = rewardInUSDC.add(PRECISION.mul(5000));
                 } else if (j == 7) {
-                    rewardInDAI = rewardInDAI.add(PRECISION.mul(10000));
+                    rewardInUSDC = rewardInUSDC.add(PRECISION.mul(10000));
                 } else {
-                    rewardInDAI = rewardInDAI.add(PRECISION.mul(20000));
+                    rewardInUSDC = rewardInUSDC.add(PRECISION.mul(20000));
                 }
-                rankReward[i][j] = rewardInDAI;
+                rankReward[i][j] = rewardInUSDC;
             }
         }
 
@@ -198,7 +198,7 @@ contract PeakReward is SignerRole {
                 if (commissionToken == address(peakToken)) {
                     incrementCareerValueInPeak(ptr, com);
                 } else if (commissionToken == stablecoin) {
-                    incrementCareerValueInDai(ptr, com);
+                    incrementCareerValueInUsdc(ptr, com);
                 }
                 emit PayCommission(referrer, ptr, commissionToken, com, i);
             }
@@ -222,9 +222,9 @@ contract PeakReward is SignerRole {
     /**
         @notice Increments a user's career value
         @param user The user
-        @param incCV The CV increase amount, in Dai
+        @param incCV The CV increase amount, in Usdc
      */
-    function incrementCareerValueInDai(address user, uint256 incCV)
+    function incrementCareerValueInUsdc(address user, uint256 incCV)
         public
         regUser(user)
         onlySigner
@@ -243,12 +243,12 @@ contract PeakReward is SignerRole {
         regUser(user)
         onlySigner
     {
-        uint256 peakPriceInDai = _getPeakPriceInDai();
-        uint256 incCVInDai = incCVInPeak.mul(peakPriceInDai).div(
+        uint256 peakPriceInUsdc = _getPeakPriceInUsdc();
+        uint256 incCVInUsdc = incCVInPeak.mul(peakPriceInUsdc).div(
             PEAK_PRECISION
         );
-        careerValue[user] = careerValue[user].add(incCVInDai);
-        emit ChangedCareerValue(user, incCVInDai, true);
+        careerValue[user] = careerValue[user].add(incCVInUsdc);
+        emit ChangedCareerValue(user, incCVInUsdc, true);
     }
 
     /**
@@ -301,7 +301,7 @@ contract PeakReward is SignerRole {
         // give user rank reward
         uint256 rewardInPeak = rankReward[currentRank][targetRank]
             .mul(PEAK_PRECISION)
-            .div(_getPeakPriceInDai());
+            .div(_getPeakPriceInUsdc());
         if (mintedPeakTokens.add(rewardInPeak) <= PEAK_MINT_CAP) {
             // mint if under cap, do nothing if over cap
             mintedPeakTokens = mintedPeakTokens.add(rewardInPeak);
@@ -327,9 +327,9 @@ contract PeakReward is SignerRole {
     }
 
     /**
-        @notice Returns the price of PEAK token in Dai, scaled by `PRECISION`.
+        @notice Returns the price of PEAK token in Usdc, scaled by `PRECISION`.
      */
-    function _getPeakPriceInDai() internal returns (uint256) {
+    function _getPeakPriceInUsdc() internal returns (uint256) {
         oracle.update();
         return oracle.consult(address(peakToken), PEAK_PRECISION);
     }

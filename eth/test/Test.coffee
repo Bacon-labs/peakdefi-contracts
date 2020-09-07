@@ -1,5 +1,5 @@
-BetokenFund = artifacts.require "BetokenFund"
-BetokenProxy = artifacts.require "BetokenProxy"
+PeakDeFiFund = artifacts.require "PeakDeFiFund"
+PeakDeFiProxy = artifacts.require "PeakDeFiProxy"
 MiniMeToken = artifacts.require "MiniMeToken"
 MiniMeTokenFactory = artifacts.require "MiniMeTokenFactory"
 TestKyberNetwork = artifacts.require "TestKyberNetwork"
@@ -32,13 +32,13 @@ bnToString = (bn) -> BigNumber(bn).toFixed(0)
 PRECISION = 1e18
 OMG_PRICE = 10 * PRECISION
 ETH_PRICE = 20 * PRECISION
-DAI_PRICE = PRECISION
+USDC_PRICE = PRECISION
 PHASE_LENGTHS = (require "../deployment_configs/testnet.json").phaseLengths
 DAY = 86400
 INACTIVE_THRESHOLD = 2
-NEW_MANAGER_KAIRO = 100 * PRECISION
+NEW_MANAGER_REPTOKEN = 100 * PRECISION
 MAX_NEW_MANAGERS_PER_CYCLE = 25
-KAIRO_PRICE = 10 * PRECISION
+REPTOKEN_PRICE = 10 * PRECISION
 PEAK_MANAGER_STAKE_REQUIRED = 1e4 * PEAK_PRECISION
 
 # travel `time` seconds forward in time
@@ -57,7 +57,7 @@ timeTravel = (time) ->
   )
 
 FUND = (cycle, phase, account) ->
-  fund = await BetokenFund.deployed()
+  fund = await PeakDeFiFund.deployed()
   curr_cycle = BigNumber(await fund.cycleNumber.call()).toNumber()
   curr_phase = BigNumber(await fund.cyclePhase.call()).toNumber()
   while curr_cycle < cycle || curr_phase < phase
@@ -67,9 +67,9 @@ FUND = (cycle, phase, account) ->
     curr_phase = BigNumber(await fund.cyclePhase.call()).toNumber()
   return fund
 
-DAI = (fund) ->
-  daiAddr = await fund.DAI_ADDR.call()
-  return TestToken.at(daiAddr)
+USDC = (fund) ->
+  usdcAddr = await fund.USDC_ADDR.call()
+  return TestToken.at(usdcAddr)
 
 KN = (fund) ->
   kyberAddr = await fund.KYBER_ADDR.call()
@@ -84,9 +84,9 @@ ST = (fund) ->
   shareTokenAddr = await fund.shareTokenAddr.call()
   return MiniMeToken.at(shareTokenAddr)
 
-KRO = (fund) ->
-  kroAddr = await fund.controlTokenAddr.call()
-  return MiniMeToken.at(kroAddr)
+REP = (fund) ->
+  repAddr = await fund.controlTokenAddr.call()
+  return MiniMeToken.at(repAddr)
 
 CPD = (underlying) ->
   factory = await TestCERC20Factory.deployed()
@@ -100,11 +100,11 @@ CO = (fund, account, id) ->
 epsilon_equal = (curr, prev) ->
   BigNumber(curr).eq(prev) or BigNumber(curr).minus(prev).div(prev).abs().lt(epsilon)
 
-calcRegisterPayAmount = (fund, kroAmount, tokenPrice) ->
-  kairoPrice = BigNumber await fund.kairoPrice.call()
-  return kroAmount * kairoPrice / tokenPrice
+calcRegisterPayAmount = (fund, repAmount, tokenPrice) ->
+  reptokenPrice = BigNumber await fund.reptokenPrice.call()
+  return repAmount * reptokenPrice / tokenPrice
 
-getReceiveKairoRatio = (delta) ->
+getReceiveRepTokenRatio = (delta) ->
   if delta >= -0.1
     # no punishment
     return 1 + delta
@@ -119,31 +119,31 @@ contract("simulation", (accounts) ->
   owner = accounts[0]
   account = accounts[1]
 
-  it("deposit_dai", () ->
+  it("deposit_usdc", () ->
     this.fund = await FUND(1, 0, owner)
-    dai = await DAI(this.fund)
+    usdc = await USDC(this.fund)
     st = await ST(this.fund)
     account2 = accounts[2]
 
-    # give DAI to user
+    # give USDC to user
     amount = 1 * PRECISION
-    await dai.mint(account2, bnToString(amount), {from: owner})
+    await usdc.mint(account2, bnToString(amount), {from: owner})
 
-    # deposit DAI
-    fundBalance = BigNumber await this.fund.totalFundsInDAI.call()
-    prevDAIBlnce = BigNumber await dai.balanceOf.call(account2)
+    # deposit USDC
+    fundBalance = BigNumber await this.fund.totalFundsInUSDC.call()
+    prevUSDCBlnce = BigNumber await usdc.balanceOf.call(account2)
     prevShareBlnce = BigNumber await st.balanceOf.call(account2)
-    await dai.approve(this.fund.address, bnToString(amount), {from: account2})
-    await this.fund.depositDAI(bnToString(amount), ZERO_ADDR, {from: account2})
-    await dai.approve(this.fund.address, 0, {from: account2})
+    await usdc.approve(this.fund.address, bnToString(amount), {from: account2})
+    await this.fund.depositUSDC(bnToString(amount), ZERO_ADDR, {from: account2})
+    await usdc.approve(this.fund.address, 0, {from: account2})
 
     # check fund balance
-    newFundBalance = BigNumber(await this.fund.totalFundsInDAI.call())
+    newFundBalance = BigNumber(await this.fund.totalFundsInUSDC.call())
     assert.equal(newFundBalance.minus(fundBalance).toNumber(), amount, "fund balance increase incorrect")
 
-    # check dai balance
-    daiBlnce = BigNumber(await dai.balanceOf.call(account2))
-    assert.equal(prevDAIBlnce.minus(daiBlnce).toNumber(), amount, "DAI balance decrease incorrect")
+    # check usdc balance
+    usdcBlnce = BigNumber(await usdc.balanceOf.call(account2))
+    assert.equal(prevUSDCBlnce.minus(usdcBlnce).toNumber(), amount, "USDC balance decrease incorrect")
 
     # check shares
     shareBlnce = BigNumber(await st.balanceOf.call(account2))
@@ -159,7 +159,7 @@ contract("simulation", (accounts) ->
     await token.mint(account, bnToString(amount), {from: owner})
 
     # deposit token
-    fundBalance = BigNumber await this.fund.totalFundsInDAI.call()
+    fundBalance = BigNumber await this.fund.totalFundsInUSDC.call()
     prevTokenBlnce = BigNumber await token.balanceOf.call(account)
     prevShareBlnce = BigNumber await st.balanceOf.call(account)
     await token.approve(this.fund.address, bnToString(amount), {from: account})
@@ -171,7 +171,7 @@ contract("simulation", (accounts) ->
     assert.equal(shareBlnce.minus(prevShareBlnce).toNumber(), Math.round(amount * OMG_PRICE / PRECISION), "received share amount incorrect")
 
     # check fund balance
-    newFundBalance = BigNumber(await this.fund.totalFundsInDAI.call())
+    newFundBalance = BigNumber(await this.fund.totalFundsInUSDC.call())
     assert.equal(newFundBalance.minus(fundBalance).toNumber(), Math.round(amount * OMG_PRICE / PRECISION), "fund balance increase incorrect")
 
     # check token balance
@@ -180,21 +180,21 @@ contract("simulation", (accounts) ->
   )
 
   it("deposit_ether", () ->
-    dai = await DAI(this.fund)
+    usdc = await USDC(this.fund)
     st = await ST(this.fund)
     account3 = accounts[3]
 
     eth_amount = 0.01 * PRECISION
-    amount = eth_amount / PRECISION * ETH_PRICE # amount of deposit in DAI
+    amount = eth_amount / PRECISION * ETH_PRICE # amount of deposit in USDC
 
     # deposit ETH
-    fundBalance = BigNumber await this.fund.totalFundsInDAI.call()
+    fundBalance = BigNumber await this.fund.totalFundsInUSDC.call()
     prevETHBlnce = BigNumber await web3.eth.getBalance(account3)
     prevShareBlnce = BigNumber await st.balanceOf.call(account3)
     await this.fund.depositEther(ZERO_ADDR, {from: account3, value: bnToString(eth_amount), gasPrice: 0})
 
     # check fund balance
-    newFundBalance = BigNumber(await this.fund.totalFundsInDAI.call())
+    newFundBalance = BigNumber(await this.fund.totalFundsInUSDC.call())
     assert.equal(newFundBalance.minus(fundBalance).toNumber(), amount, "fund balance increase incorrect")
 
     # check user ETH balance
@@ -206,28 +206,28 @@ contract("simulation", (accounts) ->
     assert.equal(shareBlnce.minus(prevShareBlnce).toNumber(), amount, "received share amount incorrect")
   )
 
-  it("withdraw_dai", () ->
-    dai = await DAI(this.fund)
+  it("withdraw_usdc", () ->
+    usdc = await USDC(this.fund)
     st = await ST(this.fund)
 
-    # withdraw dai
+    # withdraw usdc
     amount = 0.1 * PRECISION
     prevShareBlnce = BigNumber await st.balanceOf.call(account)
-    prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
-    prevDAIBlnce = BigNumber await dai.balanceOf.call(account)
-    await this.fund.withdrawDAI(bnToString(amount), {from: account})
+    prevFundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
+    prevUSDCBlnce = BigNumber await usdc.balanceOf.call(account)
+    await this.fund.withdrawUSDC(bnToString(amount), {from: account})
 
     # check shares
     shareBlnce = BigNumber await st.balanceOf.call(account)
     assert.equal(prevShareBlnce.minus(shareBlnce).toNumber(), amount, "burnt share amount incorrect")
 
     # check fund balance
-    fundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
+    fundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
     assert.equal(prevFundBlnce.minus(fundBlnce).toNumber(), amount, "fund balance decrease incorrect")
 
-    # check dai balance
-    daiBlnce = BigNumber await dai.balanceOf.call(account)
-    assert.equal(daiBlnce.minus(prevDAIBlnce).toNumber(), amount, "DAI balance increase incorrect")
+    # check usdc balance
+    usdcBlnce = BigNumber await usdc.balanceOf.call(account)
+    assert.equal(usdcBlnce.minus(prevUSDCBlnce).toNumber(), amount, "USDC balance increase incorrect")
   )
 
   it("withdraw_token", () ->
@@ -238,7 +238,7 @@ contract("simulation", (accounts) ->
     amount = 1 * PRECISION
 
     prevShareBlnce = BigNumber await st.balanceOf.call(account)
-    prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
+    prevFundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
     prevTokenBlnce = BigNumber await token.balanceOf.call(account)
     await this.fund.withdrawToken(token.address, bnToString(amount), {from: account})
 
@@ -247,23 +247,23 @@ contract("simulation", (accounts) ->
     assert.equal(prevShareBlnce.minus(shareBlnce).toNumber(), amount, "burnt share amount incorrect")
 
     # check fund balance
-    fundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
+    fundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
     assert.equal(prevFundBlnce.minus(fundBlnce).toNumber(), amount, "fund balance decrease incorrect")
 
     # check token balance
     tokenBlnce = BigNumber await token.balanceOf.call(account)
-    assert.equal(tokenBlnce.minus(prevTokenBlnce).toNumber(), Math.round(amount * PRECISION / OMG_PRICE), "DAI balance increase incorrect")
+    assert.equal(tokenBlnce.minus(prevTokenBlnce).toNumber(), Math.round(amount * PRECISION / OMG_PRICE), "USDC balance increase incorrect")
   )
 
   it("withdraw_ether", () ->
-    dai = await DAI(this.fund)
+    usdc = await USDC(this.fund)
     st = await ST(this.fund)
 
-    # withdraw dai
+    # withdraw usdc
     amount = 0.1 * PRECISION
     eth_amount = amount / ETH_PRICE * PRECISION
     prevShareBlnce = BigNumber await st.balanceOf.call(account)
-    prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
+    prevFundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
     prevETHBlnce = BigNumber await web3.eth.getBalance(account)
     await this.fund.withdrawEther(bnToString(amount), {from: account, gasPrice: 0})
 
@@ -272,7 +272,7 @@ contract("simulation", (accounts) ->
     assert.equal(prevShareBlnce.minus(shareBlnce).toNumber(), amount, "burnt share amount incorrect")
 
     # check fund balance
-    fundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
+    fundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
     assert.equal(prevFundBlnce.minus(fundBlnce).toNumber(), amount, "fund balance decrease incorrect")
 
     # check ether balance
@@ -281,13 +281,13 @@ contract("simulation", (accounts) ->
   )
 
   it("register_accounts", () ->
-    kro = await KRO(this.fund)
-    dai = await DAI(this.fund)
+    rep = await REP(this.fund)
+    usdc = await USDC(this.fund)
     token = await TK("OMG")
     account2 = accounts[2]
     account3 = accounts[3]
 
-    amount = NEW_MANAGER_KAIRO
+    amount = NEW_MANAGER_REPTOKEN
 
     # stake PEAK for accounts
     peakStaking = await PeakStaking.deployed()
@@ -305,13 +305,13 @@ contract("simulation", (accounts) ->
     # register account[1] using ETH
     await this.fund.registerWithETH({from: account, value: await calcRegisterPayAmount(this.fund, amount, ETH_PRICE)})
 
-    # mint DAI for account[2]
-    daiAmount = bnToString(await calcRegisterPayAmount(this.fund, amount, DAI_PRICE))
-    await dai.mint(account2, daiAmount, {from: owner})
+    # mint USDC for account[2]
+    usdcAmount = bnToString(await calcRegisterPayAmount(this.fund, amount, USDC_PRICE))
+    await usdc.mint(account2, usdcAmount, {from: owner})
 
     # register account[2]
-    await dai.approve(this.fund.address, daiAmount, {from: account2})
-    await this.fund.registerWithDAI({from: account2})
+    await usdc.approve(this.fund.address, usdcAmount, {from: account2})
+    await this.fund.registerWithUSDC({from: account2})
 
     # mint OMG tokens for account[3]
     omgAmount = bnToString(await calcRegisterPayAmount(this.fund, amount, OMG_PRICE))
@@ -321,10 +321,10 @@ contract("simulation", (accounts) ->
     await token.approve(this.fund.address, omgAmount, {from: account3})
     await this.fund.registerWithToken(token.address, omgAmount, {from: account3})
 
-    # check Kairo balances
-    assert(epsilon_equal(amount, await kro.balanceOf.call(account)), "account 1 Kairo amount incorrect")
-    assert(epsilon_equal(amount, await kro.balanceOf.call(account2)), "account 2 Kairo amount incorrect")
-    assert(epsilon_equal(amount, await kro.balanceOf.call(account3)), "account 3 Kairo amount incorrect")
+    # check RepToken balances
+    assert(epsilon_equal(amount, await rep.balanceOf.call(account)), "account 1 RepToken amount incorrect")
+    assert(epsilon_equal(amount, await rep.balanceOf.call(account2)), "account 2 RepToken amount incorrect")
+    assert(epsilon_equal(amount, await rep.balanceOf.call(account3)), "account 3 RepToken amount incorrect")
   )
 
   it("phase_0_to_1", () ->
@@ -343,30 +343,30 @@ contract("simulation", (accounts) ->
   it("can't_burn_deadman", () ->
     try
       await this.fund.burnDeadman(account, {from: account})
-      assert.fail("burnt KRO of active manager")
+      assert.fail("burnt REP of active manager")
   )
 
   it("create_investment", () ->
-    kro = await KRO(this.fund)
+    rep = await REP(this.fund)
     token = await TK("OMG")
     MAX_PRICE = bnToString(OMG_PRICE * 2)
 
-    prevKROBlnce = BigNumber await kro.balanceOf.call(account)
+    prevREPBlnce = BigNumber await rep.balanceOf.call(account)
     prevFundTokenBlnce = BigNumber await token.balanceOf(this.fund.address)
 
     # buy token
-    amount = NEW_MANAGER_KAIRO
+    amount = NEW_MANAGER_REPTOKEN
     await this.fund.createInvestment(token.address, bnToString(amount), MAX_PRICE, {from: account})
 
-    # check KRO balance
-    kroBlnce = BigNumber await kro.balanceOf.call(account)
-    assert.equal(prevKROBlnce.minus(kroBlnce).toNumber(), amount, "Kairo balance decrease incorrect")
+    # check REP balance
+    repBlnce = BigNumber await rep.balanceOf.call(account)
+    assert.equal(prevREPBlnce.minus(repBlnce).toNumber(), amount, "RepToken balance decrease incorrect")
 
     # check fund token balance
-    fundDAIBlnce = BigNumber await this.fund.totalFundsInDAI.call()
-    kroTotalSupply = BigNumber await kro.totalSupply.call()
+    fundUSDCBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
+    repTotalSupply = BigNumber await rep.totalSupply.call()
     fundTokenBlnce = BigNumber await token.balanceOf(this.fund.address)
-    assert.equal(fundTokenBlnce.minus(prevFundTokenBlnce).toNumber(), Math.floor(fundDAIBlnce.times(PRECISION).div(kroTotalSupply).times(amount).div(OMG_PRICE).toNumber()), "token balance increase incorrect")
+    assert.equal(fundTokenBlnce.minus(prevFundTokenBlnce).toNumber(), Math.floor(fundUSDCBlnce.times(PRECISION).div(repTotalSupply).times(amount).div(OMG_PRICE).toNumber()), "token balance increase incorrect")
 
     # create investment for account2
     account2 = accounts[2]
@@ -374,33 +374,33 @@ contract("simulation", (accounts) ->
   )
 
   it("sell_investment", () ->
-    kro = await KRO(this.fund)
+    rep = await REP(this.fund)
     token = await TK("OMG")
     MAX_PRICE = bnToString(OMG_PRICE * 2)
 
     # wait for 1 day to sell investment for accounts[1]
     await timeTravel(1 * DAY)
 
-    prevKROBlnce = BigNumber await kro.balanceOf.call(account)
+    prevREPBlnce = BigNumber await rep.balanceOf.call(account)
     prevFundTokenBlnce = BigNumber await token.balanceOf.call(this.fund.address)
-    prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
+    prevFundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
 
     # sell investment
     tokenAmount = BigNumber((await this.fund.userInvestments.call(account, 0)).tokenAmount)
     await this.fund.sellInvestmentAsset(0, bnToString(tokenAmount), 0, {from: account})
 
-    # check KRO balance
-    kroBlnce = BigNumber await kro.balanceOf.call(account)
+    # check REP balance
+    repBlnce = BigNumber await rep.balanceOf.call(account)
     stake = BigNumber((await this.fund.userInvestments.call(account, 0)).stake)
-    assert(epsilon_equal(stake, kroBlnce.minus(prevKROBlnce)), "received Kairo amount incorrect")
+    assert(epsilon_equal(stake, repBlnce.minus(prevREPBlnce)), "received RepToken amount incorrect")
 
     # check fund token balance
     fundTokenBlnce = BigNumber await token.balanceOf(this.fund.address)
     assert(epsilon_equal(tokenAmount, prevFundTokenBlnce.minus(fundTokenBlnce)), "fund token balance changed")
 
     # check fund balance
-    fundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
-    assert(epsilon_equal(prevFundBlnce, fundBlnce), "fund DAI balance changed")
+    fundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
+    assert(epsilon_equal(prevFundBlnce, fundBlnce), "fund USDC balance changed")
 
     # wait for 2 more days to sell investment for account2
     account2 = accounts[2]
@@ -412,29 +412,29 @@ contract("simulation", (accounts) ->
   )
 
   it("create_compound_orders", () ->
-    kro = await KRO(this.fund)
+    rep = await REP(this.fund)
     token = await TK("OMG")
-    dai = await DAI(this.fund)
+    usdc = await USDC(this.fund)
     MAX_PRICE = bnToString(OMG_PRICE * 2)
     fund = this.fund
     cToken = await CPD(token.address)
 
-    prevKROBlnce = BigNumber await kro.balanceOf.call(account)
-    prevFundDAIBlnce = BigNumber await dai.balanceOf.call(this.fund.address)
+    prevREPBlnce = BigNumber await rep.balanceOf.call(account)
+    prevFundUSDCBlnce = BigNumber await usdc.balanceOf.call(this.fund.address)
 
     # create short order
     amount = 0.01 * PRECISION
     await this.fund.createCompoundOrder(account, true, cToken.address, bnToString(amount), 0, MAX_PRICE, {from: account})
     shortOrder = await CO(this.fund, account, 0)
 
-    # check KRO balance
-    kroBlnce = BigNumber await kro.balanceOf.call(account)
-    assert.equal(prevKROBlnce.minus(kroBlnce).toNumber(), amount, "Kairo balance decrease incorrect")
+    # check REP balance
+    repBlnce = BigNumber await rep.balanceOf.call(account)
+    assert.equal(prevREPBlnce.minus(repBlnce).toNumber(), amount, "RepToken balance decrease incorrect")
 
     # check fund token balance
-    fundDAIBlnce = BigNumber await dai.balanceOf.call(this.fund.address)
-    kroTotalSupply = BigNumber await kro.totalSupply.call()
-    assert.equal(prevFundDAIBlnce.minus(fundDAIBlnce).toNumber(), await shortOrder.collateralAmountInDAI.call(), "DAI balance decrease incorrect")
+    fundUSDCBlnce = BigNumber await usdc.balanceOf.call(this.fund.address)
+    repTotalSupply = BigNumber await rep.totalSupply.call()
+    assert.equal(prevFundUSDCBlnce.minus(fundUSDCBlnce).toNumber(), await shortOrder.collateralAmountInUSDC.call(), "USDC balance decrease incorrect")
 
     # create long order for account2
     account2 = accounts[2]
@@ -442,57 +442,57 @@ contract("simulation", (accounts) ->
   )
 
   it("sell_compound_orders", () ->
-    kro = await KRO(this.fund)
+    rep = await REP(this.fund)
     token = await TK("OMG")
-    dai = await DAI(this.fund)
+    usdc = await USDC(this.fund)
     MAX_PRICE = bnToString(OMG_PRICE * 2)
     account2 = accounts[2]
 
 
     # SHORT ORDER SELLING
-    prevKROBlnce = BigNumber await kro.balanceOf.call(account)
-    prevFundDAIBlnce = BigNumber await dai.balanceOf.call(this.fund.address)
-    prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
+    prevREPBlnce = BigNumber await rep.balanceOf.call(account)
+    prevFundUSDCBlnce = BigNumber await usdc.balanceOf.call(this.fund.address)
+    prevFundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
 
     # sell short order
     shortOrder = await CO(this.fund, account, 0)
     await this.fund.sellCompoundOrder(account, 0, 0, MAX_PRICE, {from: account})
 
-    # check KRO balance
-    kroBlnce = BigNumber await kro.balanceOf.call(account)
+    # check REP balance
+    repBlnce = BigNumber await rep.balanceOf.call(account)
     stake = BigNumber await shortOrder.stake.call()
-    assert(epsilon_equal(stake, kroBlnce.minus(prevKROBlnce)), "account received Kairo amount incorrect")
+    assert(epsilon_equal(stake, repBlnce.minus(prevREPBlnce)), "account received RepToken amount incorrect")
 
-    # check fund DAI balance
-    fundDAIBlnce = BigNumber await dai.balanceOf.call(this.fund.address)
-    assert(epsilon_equal(await shortOrder.collateralAmountInDAI.call(), fundDAIBlnce.minus(prevFundDAIBlnce)), "short order returned incorrect DAI amount")
+    # check fund USDC balance
+    fundUSDCBlnce = BigNumber await usdc.balanceOf.call(this.fund.address)
+    assert(epsilon_equal(await shortOrder.collateralAmountInUSDC.call(), fundUSDCBlnce.minus(prevFundUSDCBlnce)), "short order returned incorrect USDC amount")
 
     # check fund balance
-    fundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
-    assert(epsilon_equal(prevFundBlnce, fundBlnce), "fund DAI balance changed")
+    fundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
+    assert(epsilon_equal(prevFundBlnce, fundBlnce), "fund USDC balance changed")
 
 
     # LONG ORDER SELLING
-    prevKROBlnce = BigNumber await kro.balanceOf.call(account2)
-    prevFundDAIBlnce = BigNumber await dai.balanceOf.call(this.fund.address)
-    prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
+    prevREPBlnce = BigNumber await rep.balanceOf.call(account2)
+    prevFundUSDCBlnce = BigNumber await usdc.balanceOf.call(this.fund.address)
+    prevFundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
 
     # sell account2's long order
     longOrder = await CO(this.fund, account2, 0)
     await this.fund.sellCompoundOrder(account2, 0, 0, bnToString(ETH_PRICE * 2), {from: account2})
 
-    # check KRO balance
-    kroBlnce = BigNumber await kro.balanceOf.call(account2)
+    # check REP balance
+    repBlnce = BigNumber await rep.balanceOf.call(account2)
     stake = BigNumber await longOrder.stake.call()
-    assert(epsilon_equal(stake, kroBlnce.minus(prevKROBlnce)), "account2 received Kairo amount incorrect")
+    assert(epsilon_equal(stake, repBlnce.minus(prevREPBlnce)), "account2 received RepToken amount incorrect")
 
-    # check fund DAI balance
-    fundDAIBlnce = BigNumber await dai.balanceOf.call(this.fund.address)
-    assert(epsilon_equal(await longOrder.collateralAmountInDAI.call(), fundDAIBlnce.minus(prevFundDAIBlnce)), "long order returned incorrect DAI amount")
+    # check fund USDC balance
+    fundUSDCBlnce = BigNumber await usdc.balanceOf.call(this.fund.address)
+    assert(epsilon_equal(await longOrder.collateralAmountInUSDC.call(), fundUSDCBlnce.minus(prevFundUSDCBlnce)), "long order returned incorrect USDC amount")
 
     # check fund balance
-    fundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
-    assert(epsilon_equal(prevFundBlnce, fundBlnce), "fund DAI balance changed")
+    fundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
+    assert(epsilon_equal(prevFundBlnce, fundBlnce), "fund USDC balance changed")
   )
 
   it("next_cycle", () ->
@@ -509,9 +509,9 @@ contract("simulation", (accounts) ->
   )
 
   it("redeem_commission", () ->
-    dai = await DAI(this.fund)
+    usdc = await USDC(this.fund)
 
-    prevDAIBlnce = BigNumber await dai.balanceOf.call(account)
+    prevUSDCBlnce = BigNumber await usdc.balanceOf.call(account)
 
     # get commission amount
     commissionAmount = await this.fund.commissionBalanceOf.call(account)
@@ -524,12 +524,12 @@ contract("simulation", (accounts) ->
       await this.fund.redeemCommission(false, {from: account})
       assert.fail()
 
-    # check DAI balance
-    daiBlnce = BigNumber await dai.balanceOf.call(account)
-    assert(epsilon_equal(daiBlnce.minus(prevDAIBlnce), commissionAmount._commission), "didn't receive correct commission")
+    # check USDC balance
+    usdcBlnce = BigNumber await usdc.balanceOf.call(account)
+    assert(epsilon_equal(usdcBlnce.minus(prevUSDCBlnce), commissionAmount._commission), "didn't receive correct commission")
 
     # check penalty
-    # only invested full kro balance for 3 days out of 9, so penalty / commission = 2
+    # only invested full rep balance for 3 days out of 9, so penalty / commission = 2
     assert(epsilon_equal(BigNumber(commissionAmount._penalty).div(commissionAmount._commission), 2), "penalty amount incorrect")
   )
 
@@ -574,10 +574,10 @@ contract("simulation", (accounts) ->
     # burn account
     await this.fund.burnDeadman(account, {from: account})
 
-    # check Kairo balance
-    kro = await KRO(this.fund)
-    kroBlnce = BigNumber await kro.balanceOf.call(account)
-    assert(kroBlnce.eq(0), "failed to burn KRO of deadman")
+    # check RepToken balance
+    rep = await REP(this.fund)
+    repBlnce = BigNumber await rep.balanceOf.call(account)
+    assert(repBlnce.eq(0), "failed to burn REP of deadman")
   )
 )
 
@@ -587,12 +587,12 @@ contract("price_changes", (accounts) ->
 
   it("prep_work", () ->
     this.fund = await FUND(1, 0, owner) # Starts in Intermission phase
-    dai = await DAI(this.fund)
+    usdc = await USDC(this.fund)
 
     amount = 10 * PRECISION
-    await dai.mint(account, bnToString(amount), {from: owner}) # Mint DAI
-    await dai.approve(this.fund.address, bnToString(amount), {from: account}) # Approve transfer
-    await this.fund.depositDAI(bnToString(amount), ZERO_ADDR, {from: account}) # Deposit for account
+    await usdc.mint(account, bnToString(amount), {from: owner}) # Mint USDC
+    await usdc.approve(this.fund.address, bnToString(amount), {from: account}) # Approve transfer
+    await this.fund.depositUSDC(bnToString(amount), ZERO_ADDR, {from: account}) # Deposit for account
 
     # stake PEAK for accounts
     peakStaking = await PeakStaking.deployed()
@@ -601,8 +601,8 @@ contract("price_changes", (accounts) ->
     await peakToken.approve(peakStaking.address, PEAK_MANAGER_STAKE_REQUIRED, {from: account})
     await peakStaking.stake(PEAK_MANAGER_STAKE_REQUIRED, 100, owner, {from: account})
 
-    kroAmount = KAIRO_PRICE
-    await this.fund.registerWithETH({from: account, value: await calcRegisterPayAmount(this.fund, kroAmount, ETH_PRICE)})
+    repAmount = REPTOKEN_PRICE
+    await this.fund.registerWithETH({from: account, value: await calcRegisterPayAmount(this.fund, repAmount, ETH_PRICE)})
 
     await timeTravel(PHASE_LENGTHS[0])
     await this.fund.nextPhase({from: owner}) # Go to Manage phase
@@ -610,7 +610,7 @@ contract("price_changes", (accounts) ->
 
   it("raise_asset_price", () ->
     kn = await KN(this.fund)
-    kro = await KRO(this.fund)
+    rep = await REP(this.fund)
     omg = await TK("OMG")
     cOMG = await CPD(omg.address)
     oracle = await TestPriceOracle.deployed()
@@ -639,52 +639,52 @@ contract("price_changes", (accounts) ->
     await oracle.setTokenPrice(cOMG.address, bnToString(newPrice), {from: owner})
 
     # sell asset
-    prevKROBlnce = BigNumber await kro.balanceOf.call(account)
-    prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
+    prevREPBlnce = BigNumber await rep.balanceOf.call(account)
+    prevFundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
     tokenAmount = BigNumber((await this.fund.userInvestments.call(account, investmentId)).tokenAmount)
     await this.fund.sellInvestmentAsset(investmentId, tokenAmount, 0, {from: account})
 
-    # check KRO reward
-    kroBlnce = BigNumber await kro.balanceOf.call(account)
-    expectedReceiveKairoRatio = getReceiveKairoRatio(delta)
-    assert(epsilon_equal(kroBlnce.minus(prevKROBlnce).div(stake), expectedReceiveKairoRatio), "investment KRO reward incorrect")
+    # check REP reward
+    repBlnce = BigNumber await rep.balanceOf.call(account)
+    expectedReceiveRepTokenRatio = getReceiveRepTokenRatio(delta)
+    assert(epsilon_equal(repBlnce.minus(prevREPBlnce).div(stake), expectedReceiveRepTokenRatio), "investment REP reward incorrect")
 
     # check fund balance
-    fundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
-    assert(fundBlnce.minus(prevFundBlnce).gt(0), "fund DAI increase incorrect")
+    fundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
+    assert(fundBlnce.minus(prevFundBlnce).gt(0), "fund USDC increase incorrect")
 
     # sell short order
-    prevKROBlnce = BigNumber await kro.balanceOf.call(account)
-    prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
+    prevREPBlnce = BigNumber await rep.balanceOf.call(account)
+    prevFundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
     await this.fund.sellCompoundOrder(account, shortId, 0, MAX_PRICE, {from: account})
 
-    # check KRO penalty
-    kroBlnce = BigNumber await kro.balanceOf.call(account)
-    expectedReceiveKairoRatio = getReceiveKairoRatio(delta * SHORT_LEVERAGE)
-    assert(epsilon_equal(kroBlnce.minus(prevKROBlnce).div(stake), expectedReceiveKairoRatio), "short KRO penalty incorrect")
+    # check REP penalty
+    repBlnce = BigNumber await rep.balanceOf.call(account)
+    expectedReceiveRepTokenRatio = getReceiveRepTokenRatio(delta * SHORT_LEVERAGE)
+    assert(epsilon_equal(repBlnce.minus(prevREPBlnce).div(stake), expectedReceiveRepTokenRatio), "short REP penalty incorrect")
 
     # check fund balance
-    fundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
-    assert(fundBlnce.minus(prevFundBlnce).lt(0), "fund DAI decrease incorrect")
+    fundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
+    assert(fundBlnce.minus(prevFundBlnce).lt(0), "fund USDC decrease incorrect")
 
     # sell long order
-    prevKROBlnce = BigNumber await kro.balanceOf.call(account)
-    prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
+    prevREPBlnce = BigNumber await rep.balanceOf.call(account)
+    prevFundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
     await this.fund.sellCompoundOrder(account, longId, 0, MAX_PRICE, {from: account})
 
-    # check KRO reward
-    kroBlnce = BigNumber await kro.balanceOf.call(account)
-    expectedReceiveKairoRatio = getReceiveKairoRatio(delta * LONG_LEVERAGE)
-    assert(epsilon_equal(kroBlnce.minus(prevKROBlnce).div(stake), expectedReceiveKairoRatio), "long KRO reward incorrect")
+    # check REP reward
+    repBlnce = BigNumber await rep.balanceOf.call(account)
+    expectedReceiveRepTokenRatio = getReceiveRepTokenRatio(delta * LONG_LEVERAGE)
+    assert(epsilon_equal(repBlnce.minus(prevREPBlnce).div(stake), expectedReceiveRepTokenRatio), "long REP reward incorrect")
 
     # check fund balance
-    fundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
-    assert(fundBlnce.minus(prevFundBlnce).gt(0), "fund DAI increase incorrect")
+    fundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
+    assert(fundBlnce.minus(prevFundBlnce).gt(0), "fund USDC increase incorrect")
   )
 
   it("lower_asset_price", () ->
     kn = await KN(this.fund)
-    kro = await KRO(this.fund)
+    rep = await REP(this.fund)
     omg = await TK("OMG")
     cOMG = await CPD(omg.address)
     oracle = await TestPriceOracle.deployed()
@@ -713,52 +713,52 @@ contract("price_changes", (accounts) ->
     await oracle.setTokenPrice(cOMG.address, bnToString(newPrice), {from: owner})
 
     # sell asset
-    prevKROBlnce = BigNumber await kro.balanceOf.call(account)
-    prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
+    prevREPBlnce = BigNumber await rep.balanceOf.call(account)
+    prevFundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
     tokenAmount = BigNumber((await this.fund.userInvestments.call(account, investmentId)).tokenAmount)
     await this.fund.sellInvestmentAsset(investmentId, tokenAmount, 0, {from: account})
 
-    # check KRO penalty
-    kroBlnce = BigNumber await kro.balanceOf.call(account)
-    expectedReceiveKairoRatio = getReceiveKairoRatio(delta)
-    assert(epsilon_equal(kroBlnce.minus(prevKROBlnce).div(stake), expectedReceiveKairoRatio), "investment KRO penalty incorrect")
+    # check REP penalty
+    repBlnce = BigNumber await rep.balanceOf.call(account)
+    expectedReceiveRepTokenRatio = getReceiveRepTokenRatio(delta)
+    assert(epsilon_equal(repBlnce.minus(prevREPBlnce).div(stake), expectedReceiveRepTokenRatio), "investment REP penalty incorrect")
 
     # check fund balance
-    fundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
-    assert(fundBlnce.minus(prevFundBlnce).lt(0), "fund DAI decrease incorrect")
+    fundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
+    assert(fundBlnce.minus(prevFundBlnce).lt(0), "fund USDC decrease incorrect")
 
     # sell short order
-    prevKROBlnce = BigNumber await kro.balanceOf.call(account)
-    prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
+    prevREPBlnce = BigNumber await rep.balanceOf.call(account)
+    prevFundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
     await this.fund.sellCompoundOrder(account, shortId, 0, MAX_PRICE, {from: account})
 
-    # check KRO reward
-    kroBlnce = BigNumber await kro.balanceOf.call(account)
-    expectedReceiveKairoRatio = getReceiveKairoRatio(delta * SHORT_LEVERAGE)
-    assert(epsilon_equal(kroBlnce.minus(prevKROBlnce).div(stake), expectedReceiveKairoRatio), "short KRO reward incorrect")
+    # check REP reward
+    repBlnce = BigNumber await rep.balanceOf.call(account)
+    expectedReceiveRepTokenRatio = getReceiveRepTokenRatio(delta * SHORT_LEVERAGE)
+    assert(epsilon_equal(repBlnce.minus(prevREPBlnce).div(stake), expectedReceiveRepTokenRatio), "short REP reward incorrect")
 
     # check fund balance
-    fundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
-    assert(fundBlnce.minus(prevFundBlnce).gt(0), "fund DAI increase incorrect")
+    fundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
+    assert(fundBlnce.minus(prevFundBlnce).gt(0), "fund USDC increase incorrect")
 
     # sell long order
-    prevKROBlnce = BigNumber await kro.balanceOf.call(account)
-    prevFundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
+    prevREPBlnce = BigNumber await rep.balanceOf.call(account)
+    prevFundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
     await this.fund.sellCompoundOrder(account, longId, 0, MAX_PRICE, {from: account})
 
-    # check KRO penalty
-    kroBlnce = BigNumber await kro.balanceOf.call(account)
-    expectedReceiveKairoRatio = getReceiveKairoRatio(delta * LONG_LEVERAGE)
-    assert(epsilon_equal(kroBlnce.minus(prevKROBlnce).div(stake), expectedReceiveKairoRatio), "long KRO penalty incorrect")
+    # check REP penalty
+    repBlnce = BigNumber await rep.balanceOf.call(account)
+    expectedReceiveRepTokenRatio = getReceiveRepTokenRatio(delta * LONG_LEVERAGE)
+    assert(epsilon_equal(repBlnce.minus(prevREPBlnce).div(stake), expectedReceiveRepTokenRatio), "long REP penalty incorrect")
 
     # check fund balance
-    fundBlnce = BigNumber await this.fund.totalFundsInDAI.call()
-    assert(fundBlnce.minus(prevFundBlnce).lt(0), "fund DAI decrease incorrect")
+    fundBlnce = BigNumber await this.fund.totalFundsInUSDC.call()
+    assert(fundBlnce.minus(prevFundBlnce).lt(0), "fund USDC decrease incorrect")
   )
 
   it("lower_asset_price_to_0", () ->
     kn = await KN(this.fund)
-    kro = await KRO(this.fund)
+    rep = await REP(this.fund)
     omg = await TK("OMG")
     cOMG = await CPD(omg.address)
     oracle = await TestPriceOracle.deployed()
@@ -780,14 +780,14 @@ contract("price_changes", (accounts) ->
     await oracle.setTokenPrice(omg.address, bnToString(newPrice), {from: owner})
 
     # sell asset
-    prevKROBlnce = BigNumber await kro.balanceOf.call(account)
+    prevREPBlnce = BigNumber await rep.balanceOf.call(account)
     tokenAmount = BigNumber((await this.fund.userInvestments.call(account, investmentId)).tokenAmount)
     await this.fund.sellInvestmentAsset(investmentId, tokenAmount, 0, {from: account})
 
-    # check KRO penalty
-    kroBlnce = BigNumber await kro.balanceOf.call(account)
-    expectedReceiveKairoRatio = 0
-    assert(epsilon_equal(kroBlnce.minus(prevKROBlnce).div(stake), expectedReceiveKairoRatio), "investment KRO penalty incorrect")
+    # check REP penalty
+    repBlnce = BigNumber await rep.balanceOf.call(account)
+    expectedReceiveRepTokenRatio = 0
+    assert(epsilon_equal(repBlnce.minus(prevREPBlnce).div(stake), expectedReceiveRepTokenRatio), "investment REP penalty incorrect")
   )
 )
 
@@ -887,14 +887,14 @@ contract("peak_reward", (accounts) ->
   peakStaking = null
   peakToken = null
   fund = null
-  dai = null
+  usdc = null
 
   it("prep_work", () ->
     peakReward = await PeakReward.deployed()
     peakStaking = await PeakStaking.deployed()
     peakToken = await TestToken.at(await peakStaking.peakToken())
     fund = await FUND(1, 0, accounts[0])
-    dai = await DAI(fund)
+    usdc = await USDC(fund)
   )
 
   it("refer()", () ->
@@ -918,10 +918,10 @@ contract("peak_reward", (accounts) ->
   it("payCommission()", () ->
     # pay commission to accounts[3], with no stakes
     rawCommissionAmount = PRECISION
-    beforeBalance3 = BigNumber(await dai.balanceOf(accounts[3]))
-    await dai.approve(peakReward.address, bnToString(rawCommissionAmount))
-    await peakReward.payCommission(accounts[3], dai.address, bnToString(rawCommissionAmount), false)
-    balanceChange3 = BigNumber(await dai.balanceOf(accounts[3])).minus(beforeBalance3)
+    beforeBalance3 = BigNumber(await usdc.balanceOf(accounts[3]))
+    await usdc.approve(peakReward.address, bnToString(rawCommissionAmount))
+    await peakReward.payCommission(accounts[3], usdc.address, bnToString(rawCommissionAmount), false)
+    balanceChange3 = BigNumber(await usdc.balanceOf(accounts[3])).minus(beforeBalance3)
     expectedReward3 = rawCommissionAmount * 0.1 / 0.2
     assert(epsilon_equal(balanceChange3, expectedReward3), "account[3] commission incorrect (no stakes)")
 
@@ -934,14 +934,14 @@ contract("peak_reward", (accounts) ->
     await peakToken.approve(peakStaking.address, bnToString(stakeAmount), {from: accounts[2]})
     await peakStaking.stake(bnToString(stakeAmount), stakeTimeInDays, ZERO_ADDR, {from: accounts[2]})
     
-    beforeBalance1 = BigNumber(await dai.balanceOf(accounts[1]))
-    beforeBalance2 = BigNumber(await dai.balanceOf(accounts[2]))
-    beforeBalance3 = BigNumber(await dai.balanceOf(accounts[3]))
-    await dai.approve(peakReward.address, bnToString(rawCommissionAmount))
-    await peakReward.payCommission(accounts[3], dai.address, bnToString(rawCommissionAmount), false)
-    balanceChange1 = BigNumber(await dai.balanceOf(accounts[1])).minus(beforeBalance1)
-    balanceChange2 = BigNumber(await dai.balanceOf(accounts[2])).minus(beforeBalance2)
-    balanceChange3 = BigNumber(await dai.balanceOf(accounts[3])).minus(beforeBalance3)
+    beforeBalance1 = BigNumber(await usdc.balanceOf(accounts[1]))
+    beforeBalance2 = BigNumber(await usdc.balanceOf(accounts[2]))
+    beforeBalance3 = BigNumber(await usdc.balanceOf(accounts[3]))
+    await usdc.approve(peakReward.address, bnToString(rawCommissionAmount))
+    await peakReward.payCommission(accounts[3], usdc.address, bnToString(rawCommissionAmount), false)
+    balanceChange1 = BigNumber(await usdc.balanceOf(accounts[1])).minus(beforeBalance1)
+    balanceChange2 = BigNumber(await usdc.balanceOf(accounts[2])).minus(beforeBalance2)
+    balanceChange3 = BigNumber(await usdc.balanceOf(accounts[3])).minus(beforeBalance3)
     expectedReward1 = rawCommissionAmount * 0.02 / 0.2
     expectedReward2 = rawCommissionAmount * 0.04 / 0.2
     expectedReward3 = rawCommissionAmount * 0.1 / 0.2
@@ -954,9 +954,9 @@ contract("peak_reward", (accounts) ->
     # acc4 goes from rank 0 => rank 2, acc5 and acc6 go from rank 0 => rank 1
     await peakReward.refer(accounts[5], accounts[4])
     await peakReward.refer(accounts[6], accounts[4])
-    await peakReward.incrementCareerValueInDai(accounts[4], bnToString(100 * PRECISION))
-    await peakReward.incrementCareerValueInDai(accounts[5], bnToString(50 * PRECISION))
-    await peakReward.incrementCareerValueInDai(accounts[6], bnToString(50 * PRECISION))
+    await peakReward.incrementCareerValueInUsdc(accounts[4], bnToString(100 * PRECISION))
+    await peakReward.incrementCareerValueInUsdc(accounts[5], bnToString(50 * PRECISION))
+    await peakReward.incrementCareerValueInUsdc(accounts[6], bnToString(50 * PRECISION))
     acc4BeforeBalance = BigNumber(await peakToken.balanceOf(accounts[4]))
     acc5BeforeBalance = BigNumber(await peakToken.balanceOf(accounts[5]))
     acc6BeforeBalance = BigNumber(await peakToken.balanceOf(accounts[6]))

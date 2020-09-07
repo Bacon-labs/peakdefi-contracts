@@ -1,5 +1,5 @@
-BetokenFund = artifacts.require "BetokenFund"
-BetokenProxy = artifacts.require "BetokenProxy"
+PeakDeFiFund = artifacts.require "PeakDeFiFund"
+PeakDeFiProxy = artifacts.require "PeakDeFiProxy"
 MiniMeToken = artifacts.require "MiniMeToken"
 MiniMeTokenFactory = artifacts.require "MiniMeTokenFactory"
 LongCERC20Order = artifacts.require "LongCERC20Order"
@@ -7,12 +7,12 @@ ShortCERC20Order = artifacts.require "ShortCERC20Order"
 LongCEtherOrder = artifacts.require "LongCEtherOrder"
 ShortCEtherOrder = artifacts.require "ShortCEtherOrder"
 CompoundOrderFactory = artifacts.require "CompoundOrderFactory"
-BetokenLogic = artifacts.require "BetokenLogic"
-BetokenLogic2 = artifacts.require "BetokenLogic2"
-BetokenLogic3 = artifacts.require "BetokenLogic3"
+PeakDeFiLogic = artifacts.require "PeakDeFiLogic"
+PeakDeFiLogic2 = artifacts.require "PeakDeFiLogic2"
+PeakDeFiLogic3 = artifacts.require "PeakDeFiLogic3"
 PeakReward = artifacts.require "PeakReward"
 PeakStaking = artifacts.require "PeakStaking"
-BetokenFactory = artifacts.require "BetokenFactory"
+PeakDeFiFactory = artifacts.require "PeakDeFiFactory"
 TestUniswapOracle = artifacts.require "TestUniswapOracle"
 
 BigNumber = require "bignumber.js"
@@ -42,19 +42,19 @@ module.exports = () ->
   TestTokenFactory.setAsDeployed(await TestTokenFactory.new())
   testTokenFactory = await TestTokenFactory.deployed()
 
-  # create TestDAI
-  testDAIAddr = (await testTokenFactory.newToken("DAI Stable Coin", "DAI", 18)).logs[0].args.addr
-  TestDAI = await TestToken.at(testDAIAddr)
+  # create TestUSDC
+  testUSDCAddr = (await testTokenFactory.newToken("USDC Stable Coin", "USDC", 18)).logs[0].args.addr
+  TestUSDC = await TestToken.at(testUSDCAddr)
   
-  # mint DAI for owner
-  await TestDAI.mint(accounts[0], bnToString(1e7 * PRECISION)) # ten million
+  # mint USDC for owner
+  await TestUSDC.mint(accounts[0], bnToString(1e7 * PRECISION)) # ten million
 
   # create TestTokens
   tokensInfo = require "../deployment_configs/kn_tokens.json"
   tokenAddrs = []
   for token in tokensInfo
     tokenAddrs.push((await testTokenFactory.newToken(token.name, token.symbol, token.decimals)).logs[0].args.addr)
-  tokenAddrs.push(TestDAI.address)
+  tokenAddrs.push(TestUSDC.address)
   tokenAddrs.push(ETH_ADDR)
   tokenPrices = (bnToString(10 * PRECISION) for i in [1..tokensInfo.length]).concat([bnToString(PRECISION), bnToString(20 * PRECISION)])
 
@@ -103,7 +103,7 @@ module.exports = () ->
     tokenObj = await TestToken.at(token)
     await tokenObj.mint(compoundTokens[token], bnToString(1e12 * PRECISION)) # one trillion tokens        
 
-  # deploy Kairo and Betoken Shares contracts
+  # deploy RepToken and PeakDeFi Shares contracts
   MiniMeTokenFactory.setAsDeployed(await MiniMeTokenFactory.new())
   minimeFactory = await MiniMeTokenFactory.deployed()
   
@@ -133,22 +133,22 @@ module.exports = () ->
     ShortCEtherOrderContract.address,
     LongCERC20OrderContract.address,
     LongCEtherOrderContract.address,
-    TestDAI.address,
+    TestUSDC.address,
     TestKyberNetworkContract.address,
     TestComptrollerContract.address,
     TestPriceOracleContract.address,
-    compoundTokens[TestDAI.address],
+    compoundTokens[TestUSDC.address],
     TestCEtherContract.address
   )
   CompoundOrderFactory.setAsDeployed(CompoundOrderFactoryContract)
 
-  # deploy BetokenLogic
-  BetokenLogicContract = await BetokenLogic.new()
-  BetokenLogic.setAsDeployed(BetokenLogicContract)
-  BetokenLogic2Contract = await BetokenLogic2.new()
-  BetokenLogic2.setAsDeployed(BetokenLogic2Contract)
-  BetokenLogic3Contract = await BetokenLogic3.new()
-  BetokenLogic3.setAsDeployed(BetokenLogic3Contract)
+  # deploy PeakDeFiLogic
+  PeakDeFiLogicContract = await PeakDeFiLogic.new()
+  PeakDeFiLogic.setAsDeployed(PeakDeFiLogicContract)
+  PeakDeFiLogic2Contract = await PeakDeFiLogic2.new()
+  PeakDeFiLogic2.setAsDeployed(PeakDeFiLogic2Contract)
+  PeakDeFiLogic3Contract = await PeakDeFiLogic3.new()
+  PeakDeFiLogic3.setAsDeployed(PeakDeFiLogic3Contract)
 
   # deploy PeakDeFi contracts
   TestUniswapOracleContract = await TestUniswapOracle.new()
@@ -162,41 +162,41 @@ module.exports = () ->
   PeakStakingContract = await PeakStaking.new(PeakToken.address)
   PeakStaking.setAsDeployed(PeakStakingContract)
   await PeakToken.addMinter(PeakStakingContract.address)
-  PeakRewardContract = await PeakReward.new(accounts[0], PeakStakingContract.address, PeakToken.address, testDAIAddr, TestUniswapOracleContract.address)
+  PeakRewardContract = await PeakReward.new(accounts[0], PeakStakingContract.address, PeakToken.address, testUSDCAddr, TestUniswapOracleContract.address)
   PeakReward.setAsDeployed(PeakRewardContract)
   await PeakToken.addMinter(PeakRewardContract.address)
   await PeakStakingContract.init(PeakRewardContract.address)
   await PeakRewardContract.addSigner(PeakStakingContract.address)
 
-  # deploy BetokenFund template
-  fundTemplate = await BetokenFund.new()
+  # deploy PeakDeFiFund template
+  fundTemplate = await PeakDeFiFund.new()
 
-  # deploy BetokenFactory
-  betokenFactory = await BetokenFactory.new(
-    TestDAI.address,
+  # deploy PeakDeFiFactory
+  peakdefiFactory = await PeakDeFiFactory.new(
+    TestUSDC.address,
     TestKyberNetworkContract.address,
     ZERO_ADDR,
     fundTemplate.address,
-    BetokenLogicContract.address,
-    BetokenLogic2Contract.address,
-    BetokenLogic3Contract.address,
+    PeakDeFiLogicContract.address,
+    PeakDeFiLogic2Contract.address,
+    PeakDeFiLogic3Contract.address,
     PeakRewardContract.address,
     PeakStakingContract.address,
     minimeFactory.address
   )
 
-  await PeakRewardContract.addSigner(betokenFactory.address)
+  await PeakRewardContract.addSigner(peakdefiFactory.address)
 
-  # deploy BetokenFund
+  # deploy PeakDeFiFund
   compoundTokensArray = (compoundTokens[token] for token in tokenAddrs[0..tokenAddrs.length - 3])
   compoundTokensArray.push(TestCEtherContract.address)
-  betokenFundAddr = await betokenFactory.createFund.call()
-  await betokenFactory.createFund()
-  betokenFund = await BetokenFund.at(betokenFundAddr)
-  await betokenFactory.initFund1(betokenFund.address, 'Kairo', 'KRO', 'Betoken Shares', 'BTKS')
-  await betokenFactory.initFund2(betokenFund.address, tokenAddrs[0..tokenAddrs.length - 3].concat([ETH_ADDR]), compoundTokensArray)
-  await betokenFactory.initFund3(betokenFund.address, bnToString(config.NEW_MANAGER_KAIRO), bnToString(config.MAX_NEW_MANAGERS_PER_CYCLE), bnToString(config.KAIRO_PRICE), bnToString(config.PEAK_MANAGER_STAKE_REQUIRED), false)
-  await betokenFactory.initFund4(betokenFund.address, accounts[0], config.devFundingRate, config.phaseLengths, CompoundOrderFactoryContract.address)
-  await betokenFund.nextPhase()
+  peakdefiFundAddr = await peakdefiFactory.createFund.call()
+  await peakdefiFactory.createFund()
+  peakdefiFund = await PeakDeFiFund.at(peakdefiFundAddr)
+  await peakdefiFactory.initFund1(peakdefiFund.address, 'RepToken', 'REP', 'PeakDeFi Shares', 'BTKS')
+  await peakdefiFactory.initFund2(peakdefiFund.address, tokenAddrs[0..tokenAddrs.length - 3].concat([ETH_ADDR]), compoundTokensArray)
+  await peakdefiFactory.initFund3(peakdefiFund.address, bnToString(config.NEW_MANAGER_REPTOKEN), bnToString(config.MAX_NEW_MANAGERS_PER_CYCLE), bnToString(config.REPTOKEN_PRICE), bnToString(config.PEAK_MANAGER_STAKE_REQUIRED), false)
+  await peakdefiFactory.initFund4(peakdefiFund.address, accounts[0], config.devFundingRate, config.phaseLengths, CompoundOrderFactoryContract.address)
+  await peakdefiFund.nextPhase()
 
-  BetokenFund.setAsDeployed(betokenFund)
+  PeakDeFiFund.setAsDeployed(peakdefiFund)

@@ -6,7 +6,7 @@ contract LongCEtherOrder is CompoundOrder {
   modifier isValidPrice(uint256 _minPrice, uint256 _maxPrice) {
     // Ensure token's price is between _minPrice and _maxPrice
     uint256 tokenPrice = PRECISION; // The price of ETH in ETH is just 1
-    tokenPrice = __tokenToDAI(CETH_ADDR, tokenPrice); // Convert token price to be in DAI
+    tokenPrice = __tokenToUSDC(CETH_ADDR, tokenPrice); // Convert token price to be in USDC
     require(tokenPrice >= _minPrice && tokenPrice <= _maxPrice); // Ensure price is within range
     _;
   }
@@ -19,36 +19,36 @@ contract LongCEtherOrder is CompoundOrder {
   {
     buyTime = now;
     
-    // Get funds in DAI from BetokenFund
-    dai.safeTransferFrom(owner(), address(this), collateralAmountInDAI); // Transfer DAI from BetokenFund
+    // Get funds in USDC from PeakDeFiFund
+    usdc.safeTransferFrom(owner(), address(this), collateralAmountInUSDC); // Transfer USDC from PeakDeFiFund
 
-    // Convert received DAI to longing token
-    (,uint256 actualTokenAmount) = __sellDAIForToken(collateralAmountInDAI);
+    // Convert received USDC to longing token
+    (,uint256 actualTokenAmount) = __sellUSDCForToken(collateralAmountInUSDC);
 
     // Enter Compound markets
     CEther market = CEther(compoundTokenAddr);
     address[] memory markets = new address[](2);
     markets[0] = compoundTokenAddr;
-    markets[1] = address(CDAI);
+    markets[1] = address(CUSDC);
     uint[] memory errors = COMPTROLLER.enterMarkets(markets);
     require(errors[0] == 0 && errors[1] == 0);
     
-    // Get loan from Compound in DAI
+    // Get loan from Compound in USDC
     market.mint.value(actualTokenAmount)(); // Transfer tokens into Compound as supply
-    require(CDAI.borrow(loanAmountInDAI) == 0);// Take out loan in DAI
-    (bool negLiquidity, ) = getCurrentLiquidityInDAI();
+    require(CUSDC.borrow(loanAmountInUSDC) == 0);// Take out loan in USDC
+    (bool negLiquidity, ) = getCurrentLiquidityInUSDC();
     require(!negLiquidity); // Ensure account liquidity is positive
 
-    // Convert borrowed DAI to longing token
-    __sellDAIForToken(loanAmountInDAI);
+    // Convert borrowed USDC to longing token
+    __sellUSDCForToken(loanAmountInUSDC);
 
-    // Repay leftover DAI to avoid complications
-    if (dai.balanceOf(address(this)) > 0) {
-      uint256 repayAmount = dai.balanceOf(address(this));
-      dai.safeApprove(address(CDAI), 0);
-      dai.safeApprove(address(CDAI), repayAmount);
-      require(CDAI.repayBorrow(repayAmount) == 0);
-      dai.safeApprove(address(CDAI), 0);
+    // Repay leftover USDC to avoid complications
+    if (usdc.balanceOf(address(this)) > 0) {
+      uint256 repayAmount = usdc.balanceOf(address(this));
+      usdc.safeApprove(address(CUSDC), 0);
+      usdc.safeApprove(address(CUSDC), repayAmount);
+      require(CUSDC.repayBorrow(repayAmount) == 0);
+      usdc.safeApprove(address(CUSDC), 0);
     }
   }
 
@@ -62,15 +62,15 @@ contract LongCEtherOrder is CompoundOrder {
     require(isSold == false);
     isSold = true;
 
-    // Siphon remaining collateral by repaying x DAI and getting back 1.5x DAI collateral
+    // Siphon remaining collateral by repaying x USDC and getting back 1.5x USDC collateral
     // Repeat to ensure debt is exhausted
     CEther market = CEther(compoundTokenAddr);
     for (uint256 i = 0; i < MAX_REPAY_STEPS; i = i.add(1)) {
-      uint256 currentDebt = getCurrentBorrowInDAI();
+      uint256 currentDebt = getCurrentBorrowInUSDC();
       if (currentDebt > NEGLIGIBLE_DEBT) {
         // Determine amount to be repaid this step
-        uint256 currentBalance = getCurrentCashInDAI();
-        uint256 repayAmount = 0; // amount to be repaid in DAI
+        uint256 currentBalance = getCurrentCashInUSDC();
+        uint256 repayAmount = 0; // amount to be repaid in USDC
         if (currentDebt <= currentBalance) {
           // Has enough money, repay all debt
           repayAmount = currentDebt;
@@ -84,9 +84,9 @@ contract LongCEtherOrder is CompoundOrder {
       }
 
       // Withdraw all available liquidity
-      (bool isNeg, uint256 liquidity) = getCurrentLiquidityInDAI();
+      (bool isNeg, uint256 liquidity) = getCurrentLiquidityInUSDC();
       if (!isNeg) {
-        liquidity = __daiToToken(compoundTokenAddr, liquidity);
+        liquidity = __usdcToToken(compoundTokenAddr, liquidity);
         uint256 errorCode = market.redeemUnderlying(liquidity.mul(PRECISION.sub(DEFAULT_LIQUIDITY_SLIPPAGE)).div(PRECISION));
         if (errorCode != 0) {
           // error
@@ -105,36 +105,36 @@ contract LongCEtherOrder is CompoundOrder {
       }
     }
 
-    // Sell all longing token to DAI
-    __sellTokenForDAI(address(this).balance);
+    // Sell all longing token to USDC
+    __sellTokenForUSDC(address(this).balance);
 
-    // Send DAI back to BetokenFund and return
-    _inputAmount = collateralAmountInDAI;
-    _outputAmount = dai.balanceOf(address(this));
+    // Send USDC back to PeakDeFiFund and return
+    _inputAmount = collateralAmountInUSDC;
+    _outputAmount = usdc.balanceOf(address(this));
     outputAmount = _outputAmount;
-    dai.safeTransfer(owner(), dai.balanceOf(address(this)));
+    usdc.safeTransfer(owner(), usdc.balanceOf(address(this)));
     toPayableAddr(owner()).transfer(address(this).balance); // Send back potential leftover tokens
   }
 
   // Allows manager to repay loan to avoid liquidation
-  function repayLoan(uint256 _repayAmountInDAI) public onlyOwner {
+  function repayLoan(uint256 _repayAmountInUSDC) public onlyOwner {
     require(buyTime > 0); // Ensure the order has been executed
 
-    // Convert longing token to DAI
-    uint256 repayAmountInToken = __daiToToken(compoundTokenAddr, _repayAmountInDAI);
-    (uint256 actualDAIAmount,) = __sellTokenForDAI(repayAmountInToken);
+    // Convert longing token to USDC
+    uint256 repayAmountInToken = __usdcToToken(compoundTokenAddr, _repayAmountInUSDC);
+    (uint256 actualUSDCAmount,) = __sellTokenForUSDC(repayAmountInToken);
     
     // Check if amount is greater than borrow balance
-    uint256 currentDebt = CDAI.borrowBalanceCurrent(address(this));
-    if (actualDAIAmount > currentDebt) {
-      actualDAIAmount = currentDebt;
+    uint256 currentDebt = CUSDC.borrowBalanceCurrent(address(this));
+    if (actualUSDCAmount > currentDebt) {
+      actualUSDCAmount = currentDebt;
     }
 
     // Repay loan to Compound
-    dai.safeApprove(address(CDAI), 0);
-    dai.safeApprove(address(CDAI), actualDAIAmount);
-    require(CDAI.repayBorrow(actualDAIAmount) == 0);
-    dai.safeApprove(address(CDAI), 0);
+    usdc.safeApprove(address(CUSDC), 0);
+    usdc.safeApprove(address(CUSDC), actualUSDCAmount);
+    require(CUSDC.repayBorrow(actualUSDCAmount) == 0);
+    usdc.safeApprove(address(CUSDC), 0);
   }
 
   function getMarketCollateralFactor() public view returns (uint256) {
@@ -142,20 +142,20 @@ contract LongCEtherOrder is CompoundOrder {
     return ratio;
   }
 
-  function getCurrentCollateralInDAI() public returns (uint256 _amount) {
+  function getCurrentCollateralInUSDC() public returns (uint256 _amount) {
     CEther market = CEther(compoundTokenAddr);
-    uint256 supply = __tokenToDAI(compoundTokenAddr, market.balanceOf(address(this)).mul(market.exchangeRateCurrent()).div(PRECISION));
+    uint256 supply = __tokenToUSDC(compoundTokenAddr, market.balanceOf(address(this)).mul(market.exchangeRateCurrent()).div(PRECISION));
     return supply;
   }
 
-  function getCurrentBorrowInDAI() public returns (uint256 _amount) {
-    uint256 borrow = CDAI.borrowBalanceCurrent(address(this));
+  function getCurrentBorrowInUSDC() public returns (uint256 _amount) {
+    uint256 borrow = CUSDC.borrowBalanceCurrent(address(this));
     return borrow;
   }
 
-  function getCurrentCashInDAI() public view returns (uint256 _amount) {
+  function getCurrentCashInUSDC() public view returns (uint256 _amount) {
     ERC20Detailed token = __underlyingToken(compoundTokenAddr);
-    uint256 cash = __tokenToDAI(compoundTokenAddr, getBalance(token, address(this)));
+    uint256 cash = __tokenToUSDC(compoundTokenAddr, getBalance(token, address(this)));
     return cash;
   }
 }

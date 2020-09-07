@@ -5,27 +5,27 @@ import "../Utils.sol";
 import "@openzeppelin/contracts/ownership/Ownable.sol";
 
 contract TestKyberNetwork is KyberNetwork, Utils(address(0), address(0), address(0)), Ownable {
-  mapping(address => uint256) public priceInDAI;
+  mapping(address => uint256) public priceInUSDC;
 
-  constructor(address[] memory _tokens, uint256[] memory _pricesInDAI) public {
+  constructor(address[] memory _tokens, uint256[] memory _pricesInUSDC) public {
     for (uint256 i = 0; i < _tokens.length; i = i.add(1)) {
-      priceInDAI[_tokens[i]] = _pricesInDAI[i];
+      priceInUSDC[_tokens[i]] = _pricesInUSDC[i];
     }
   }
 
-  function setTokenPrice(address _token, uint256 _priceInDAI) public onlyOwner {
-    priceInDAI[_token] = _priceInDAI;
+  function setTokenPrice(address _token, uint256 _priceInUSDC) public onlyOwner {
+    priceInUSDC[_token] = _priceInUSDC;
   }
 
-  function setAllTokenPrices(address[] memory _tokens, uint256[] memory _pricesInDAI) public onlyOwner {
+  function setAllTokenPrices(address[] memory _tokens, uint256[] memory _pricesInUSDC) public onlyOwner {
     for (uint256 i = 0; i < _tokens.length; i = i.add(1)) {
-      priceInDAI[_tokens[i]] = _pricesInDAI[i];
+      priceInUSDC[_tokens[i]] = _pricesInUSDC[i];
     }
   }
 
   function getExpectedRate(ERC20Detailed src, ERC20Detailed dest, uint /*srcQty*/) external view returns (uint expectedRate, uint slippageRate) 
   {
-    uint256 result = priceInDAI[address(src)].mul(10**getDecimals(dest)).mul(PRECISION).div(priceInDAI[address(dest)].mul(10**getDecimals(src)));
+    uint256 result = priceInUSDC[address(src)].mul(10**getDecimals(dest)).mul(PRECISION).div(priceInUSDC[address(dest)].mul(10**getDecimals(src)));
     return (result, result);
   }
 
@@ -64,7 +64,7 @@ contract TestKyberNetwork is KyberNetwork, Utils(address(0), address(0), address
     uint srcAmount,
     ERC20Detailed dest
   ) internal view returns (uint destAmount) {
-    return srcAmount.mul(priceInDAI[address(src)]).mul(10**getDecimals(dest)).div(priceInDAI[address(dest)].mul(10**getDecimals(src)));
+    return srcAmount.mul(priceInUSDC[address(src)]).mul(10**getDecimals(dest)).div(priceInUSDC[address(dest)].mul(10**getDecimals(src)));
   }
 
   function() external payable {}

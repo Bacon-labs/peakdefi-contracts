@@ -1,15 +1,15 @@
 pragma solidity 0.5.17;
 
-import "./BetokenStorage.sol";
+import "./PeakDeFiStorage.sol";
 import "./derivatives/CompoundOrderFactory.sol";
 import "@nomiclabs/buidler/console.sol";
 
 /**
- * @title Part of the functions for BetokenFund
+ * @title Part of the functions for PeakDeFiFund
  * @author Zefram Lou (Zebang Liu)
  */
-contract BetokenLogic2 is
-    BetokenStorage,
+contract PeakDeFiLogic2 is
+    PeakDeFiStorage,
     Utils(address(0), address(0), address(0))
 {
     /**
@@ -42,7 +42,7 @@ contract BetokenLogic2 is
     }
 
     /**
-     * @notice Deposit Ether into the fund. Ether will be converted into DAI.
+     * @notice Deposit Ether into the fund. Ether will be converted into USDC.
      * @param _useKyber true for Kyber Network, false for 1inch
      * @param _calldata calldata for 1inch trading
      * @param _referrer the referrer's address
@@ -53,20 +53,20 @@ contract BetokenLogic2 is
         bytes memory _calldata,
         address _referrer
     ) public payable nonReentrant notReadyForUpgrade {
-        // Buy DAI with ETH
-        uint256 actualDAIDeposited;
+        // Buy USDC with ETH
+        uint256 actualUSDCDeposited;
         uint256 actualETHDeposited;
         if (_useKyber) {
-            (, , actualDAIDeposited, actualETHDeposited) = __kyberTrade(
+            (, , actualUSDCDeposited, actualETHDeposited) = __kyberTrade(
                 ETH_TOKEN_ADDRESS,
                 msg.value,
-                dai
+                usdc
             );
         } else {
-            (, , actualDAIDeposited, actualETHDeposited) = __oneInchTrade(
+            (, , actualUSDCDeposited, actualETHDeposited) = __oneInchTrade(
                 ETH_TOKEN_ADDRESS,
                 msg.value,
-                dai,
+                usdc,
                 _calldata
             );
         }
@@ -78,7 +78,7 @@ contract BetokenLogic2 is
         }
 
         // Register investment
-        __deposit(actualDAIDeposited, _referrer);
+        __deposit(actualUSDCDeposited, _referrer);
 
         // Emit event
         emit Deposit(
@@ -86,33 +86,33 @@ contract BetokenLogic2 is
             msg.sender,
             address(ETH_TOKEN_ADDRESS),
             actualETHDeposited,
-            actualDAIDeposited,
+            actualUSDCDeposited,
             now
         );
     }
 
     /**
-     * @notice Deposit DAI Stablecoin into the fund.
-     * @param _daiAmount The amount of DAI to be deposited. May be different from actual deposited amount.
+     * @notice Deposit USDC Stablecoin into the fund.
+     * @param _usdcAmount The amount of USDC to be deposited. May be different from actual deposited amount.
      * @param _referrer the referrer's address
      */
-    function depositDAI(uint256 _daiAmount, address _referrer)
+    function depositUSDC(uint256 _usdcAmount, address _referrer)
         public
         nonReentrant
         notReadyForUpgrade
     {
-        dai.safeTransferFrom(msg.sender, address(this), _daiAmount);
+        usdc.safeTransferFrom(msg.sender, address(this), _usdcAmount);
 
         // Register investment
-        __deposit(_daiAmount, _referrer);
+        __deposit(_usdcAmount, _referrer);
 
         // Emit event
         emit Deposit(
             cycleNumber,
             msg.sender,
-            DAI_ADDR,
-            _daiAmount,
-            _daiAmount,
+            USDC_ADDR,
+            _usdcAmount,
+            _usdcAmount,
             now
         );
     }
@@ -127,7 +127,7 @@ contract BetokenLogic2 is
     }
 
     /**
-     * @notice Deposit ERC20 tokens into the fund. Tokens will be converted into DAI.
+     * @notice Deposit ERC20 tokens into the fund. Tokens will be converted into USDC.
      * @param _tokenAddr the address of the token to be deposited
      * @param _tokenAmount The amount of tokens to be deposited. May be different from actual deposited amount.
      * @param _useKyber true for Kyber Network, false for 1inch
@@ -142,26 +142,26 @@ contract BetokenLogic2 is
         address _referrer
     ) public nonReentrant notReadyForUpgrade isValidToken(_tokenAddr) {
         require(
-            _tokenAddr != DAI_ADDR && _tokenAddr != address(ETH_TOKEN_ADDRESS)
+            _tokenAddr != USDC_ADDR && _tokenAddr != address(ETH_TOKEN_ADDRESS)
         );
 
         ERC20Detailed token = ERC20Detailed(_tokenAddr);
 
         token.safeTransferFrom(msg.sender, address(this), _tokenAmount);
-        // Convert token into DAI
-        uint256 actualDAIDeposited;
+        // Convert token into USDC
+        uint256 actualUSDCDeposited;
         uint256 actualTokenDeposited;
         if (_useKyber) {
-            (, , actualDAIDeposited, actualTokenDeposited) = __kyberTrade(
+            (, , actualUSDCDeposited, actualTokenDeposited) = __kyberTrade(
                 token,
                 _tokenAmount,
-                dai
+                usdc
             );
         } else {
-            (, , actualDAIDeposited, actualTokenDeposited) = __oneInchTrade(
+            (, , actualUSDCDeposited, actualTokenDeposited) = __oneInchTrade(
                 token,
                 _tokenAmount,
-                dai,
+                usdc,
                 _calldata
             );
         }
@@ -172,7 +172,7 @@ contract BetokenLogic2 is
         }
 
         // Register investment
-        __deposit(actualDAIDeposited, _referrer);
+        __deposit(actualUSDCDeposited, _referrer);
 
         // Emit event
         emit Deposit(
@@ -180,46 +180,46 @@ contract BetokenLogic2 is
             msg.sender,
             _tokenAddr,
             actualTokenDeposited,
-            actualDAIDeposited,
+            actualUSDCDeposited,
             now
         );
     }
 
-    function withdrawEther(uint256 _amountInDAI) external {
+    function withdrawEther(uint256 _amountInUSDC) external {
         bytes memory nil;
-        withdrawEtherAdvanced(_amountInDAI, true, nil);
+        withdrawEtherAdvanced(_amountInUSDC, true, nil);
     }
 
     /**
      * @notice Withdraws Ether by burning Shares.
-     * @param _amountInDAI Amount of funds to be withdrawn expressed in DAI. Fixed-point decimal. May be different from actual amount.
+     * @param _amountInUSDC Amount of funds to be withdrawn expressed in USDC. Fixed-point decimal. May be different from actual amount.
      * @param _useKyber true for Kyber Network, false for 1inch
      * @param _calldata calldata for 1inch trading
      */
     function withdrawEtherAdvanced(
-        uint256 _amountInDAI,
+        uint256 _amountInUSDC,
         bool _useKyber,
         bytes memory _calldata
     ) public nonReentrant during(CyclePhase.Intermission) {
         // Buy ETH
         uint256 actualETHWithdrawn;
-        uint256 actualDAIWithdrawn;
+        uint256 actualUSDCWithdrawn;
         if (_useKyber) {
-            (, , actualETHWithdrawn, actualDAIWithdrawn) = __kyberTrade(
-                dai,
-                _amountInDAI,
+            (, , actualETHWithdrawn, actualUSDCWithdrawn) = __kyberTrade(
+                usdc,
+                _amountInUSDC,
                 ETH_TOKEN_ADDRESS
             );
         } else {
-            (, , actualETHWithdrawn, actualDAIWithdrawn) = __oneInchTrade(
-                dai,
-                _amountInDAI,
+            (, , actualETHWithdrawn, actualUSDCWithdrawn) = __oneInchTrade(
+                usdc,
+                _amountInUSDC,
                 ETH_TOKEN_ADDRESS,
                 _calldata
             );
         }
 
-        __withdraw(actualDAIWithdrawn);
+        __withdraw(actualUSDCWithdrawn);
 
         // Transfer Ether to user
         msg.sender.transfer(actualETHWithdrawn);
@@ -230,51 +230,51 @@ contract BetokenLogic2 is
             msg.sender,
             address(ETH_TOKEN_ADDRESS),
             actualETHWithdrawn,
-            actualDAIWithdrawn,
+            actualUSDCWithdrawn,
             now
         );
     }
 
     /**
      * @notice Withdraws Ether by burning Shares.
-     * @param _amountInDAI Amount of funds to be withdrawn expressed in DAI. Fixed-point decimal. May be different from actual amount.
+     * @param _amountInUSDC Amount of funds to be withdrawn expressed in USDC. Fixed-point decimal. May be different from actual amount.
      */
-    function withdrawDAI(uint256 _amountInDAI)
+    function withdrawUSDC(uint256 _amountInUSDC)
         external
         nonReentrant
         during(CyclePhase.Intermission)
     {
-        __withdraw(_amountInDAI);
+        __withdraw(_amountInUSDC);
 
-        // Transfer DAI to user
-        dai.safeTransfer(msg.sender, _amountInDAI);
+        // Transfer USDC to user
+        usdc.safeTransfer(msg.sender, _amountInUSDC);
 
         // Emit event
         emit Withdraw(
             cycleNumber,
             msg.sender,
-            DAI_ADDR,
-            _amountInDAI,
-            _amountInDAI,
+            USDC_ADDR,
+            _amountInUSDC,
+            _amountInUSDC,
             now
         );
     }
 
-    function withdrawToken(address _tokenAddr, uint256 _amountInDAI) external {
+    function withdrawToken(address _tokenAddr, uint256 _amountInUSDC) external {
         bytes memory nil;
-        withdrawTokenAdvanced(_tokenAddr, _amountInDAI, true, nil);
+        withdrawTokenAdvanced(_tokenAddr, _amountInUSDC, true, nil);
     }
 
     /**
      * @notice Withdraws funds by burning Shares, and converts the funds into the specified token using Kyber Network.
      * @param _tokenAddr the address of the token to be withdrawn into the caller's account
-     * @param _amountInDAI The amount of funds to be withdrawn expressed in DAI. Fixed-point decimal. May be different from actual amount.
+     * @param _amountInUSDC The amount of funds to be withdrawn expressed in USDC. Fixed-point decimal. May be different from actual amount.
      * @param _useKyber true for Kyber Network, false for 1inch
      * @param _calldata calldata for 1inch trading
      */
     function withdrawTokenAdvanced(
         address _tokenAddr,
-        uint256 _amountInDAI,
+        uint256 _amountInUSDC,
         bool _useKyber,
         bytes memory _calldata
     )
@@ -284,30 +284,30 @@ contract BetokenLogic2 is
         isValidToken(_tokenAddr)
     {
         require(
-            _tokenAddr != DAI_ADDR && _tokenAddr != address(ETH_TOKEN_ADDRESS)
+            _tokenAddr != USDC_ADDR && _tokenAddr != address(ETH_TOKEN_ADDRESS)
         );
 
         ERC20Detailed token = ERC20Detailed(_tokenAddr);
 
-        // Convert DAI into desired tokens
+        // Convert USDC into desired tokens
         uint256 actualTokenWithdrawn;
-        uint256 actualDAIWithdrawn;
+        uint256 actualUSDCWithdrawn;
         if (_useKyber) {
-            (, , actualTokenWithdrawn, actualDAIWithdrawn) = __kyberTrade(
-                dai,
-                _amountInDAI,
+            (, , actualTokenWithdrawn, actualUSDCWithdrawn) = __kyberTrade(
+                usdc,
+                _amountInUSDC,
                 token
             );
         } else {
-            (, , actualTokenWithdrawn, actualDAIWithdrawn) = __oneInchTrade(
-                dai,
-                _amountInDAI,
+            (, , actualTokenWithdrawn, actualUSDCWithdrawn) = __oneInchTrade(
+                usdc,
+                _amountInUSDC,
                 token,
                 _calldata
             );
         }
 
-        __withdraw(actualDAIWithdrawn);
+        __withdraw(actualUSDCWithdrawn);
 
         // Transfer tokens to user
         token.safeTransfer(msg.sender, actualTokenWithdrawn);
@@ -318,7 +318,7 @@ contract BetokenLogic2 is
             msg.sender,
             _tokenAddr,
             actualTokenWithdrawn,
-            actualDAIWithdrawn,
+            actualUSDCWithdrawn,
             now
         );
     }
@@ -328,10 +328,10 @@ contract BetokenLogic2 is
      */
 
     /**
-     * @notice Registers `msg.sender` as a manager, using DAI as payment. The more one pays, the more Kairo one gets.
-     *         There's a max Kairo amount that can be bought, and excess payment will be sent back to sender.
+     * @notice Registers `msg.sender` as a manager, using USDC as payment. The more one pays, the more RepToken one gets.
+     *         There's a max RepToken amount that can be bought, and excess payment will be sent back to sender.
      */
-    function registerWithDAI()
+    function registerWithUSDC()
         public
         during(CyclePhase.Intermission)
         nonReentrant
@@ -343,14 +343,14 @@ contract BetokenLogic2 is
         uint256 peakStake = peakStaking.userStakeAmount(msg.sender);
         require(peakStake >= peakManagerStakeRequired);
 
-        uint256 donationInDAI = newManagerKairo.mul(kairoPrice).div(PRECISION);
-        dai.safeTransferFrom(msg.sender, address(this), donationInDAI);
-        __register(donationInDAI);
+        uint256 donationInUSDC = newManagerRepToken.mul(reptokenPrice).div(PRECISION);
+        usdc.safeTransferFrom(msg.sender, address(this), donationInUSDC);
+        __register(donationInUSDC);
     }
 
     /**
-     * @notice Registers `msg.sender` as a manager, using ETH as payment. The more one pays, the more Kairo one gets.
-     *         There's a max Kairo amount that can be bought, and excess payment will be sent back to sender.
+     * @notice Registers `msg.sender` as a manager, using ETH as payment. The more one pays, the more RepToken one gets.
+     *         There's a max RepToken amount that can be bought, and excess payment will be sent back to sender.
      */
     function registerWithETH()
         public
@@ -365,25 +365,25 @@ contract BetokenLogic2 is
         uint256 peakStake = peakStaking.userStakeAmount(msg.sender);
         require(peakStake >= peakManagerStakeRequired);
 
-        uint256 receivedDAI;
+        uint256 receivedUSDC;
 
-        // trade ETH for DAI
-        (, , receivedDAI, ) = __kyberTrade(ETH_TOKEN_ADDRESS, msg.value, dai);
+        // trade ETH for USDC
+        (, , receivedUSDC, ) = __kyberTrade(ETH_TOKEN_ADDRESS, msg.value, usdc);
 
-        // if DAI value is greater than the amount required, return excess DAI to msg.sender
-        uint256 donationInDAI = newManagerKairo.mul(kairoPrice).div(PRECISION);
-        if (receivedDAI > donationInDAI) {
-            dai.safeTransfer(msg.sender, receivedDAI.sub(donationInDAI));
-            receivedDAI = donationInDAI;
+        // if USDC value is greater than the amount required, return excess USDC to msg.sender
+        uint256 donationInUSDC = newManagerRepToken.mul(reptokenPrice).div(PRECISION);
+        if (receivedUSDC > donationInUSDC) {
+            usdc.safeTransfer(msg.sender, receivedUSDC.sub(donationInUSDC));
+            receivedUSDC = donationInUSDC;
         }
 
         // register new manager
-        __register(receivedDAI);
+        __register(receivedUSDC);
     }
 
     /**
-     * @notice Registers `msg.sender` as a manager, using tokens as payment. The more one pays, the more Kairo one gets.
-     *         There's a max Kairo amount that can be bought, and excess payment will be sent back to sender.
+     * @notice Registers `msg.sender` as a manager, using tokens as payment. The more one pays, the more RepToken one gets.
+     *         There's a max RepToken amount that can be bought, and excess payment will be sent back to sender.
      * @param _token the token to be used for payment
      * @param _donationInTokens the amount of tokens to be used for registration, should use the token's native decimals
      */
@@ -402,29 +402,29 @@ contract BetokenLogic2 is
         require(
             _token != address(0) &&
                 _token != address(ETH_TOKEN_ADDRESS) &&
-                _token != DAI_ADDR
+                _token != USDC_ADDR
         );
         ERC20Detailed token = ERC20Detailed(_token);
         require(token.totalSupply() > 0);
 
         token.safeTransferFrom(msg.sender, address(this), _donationInTokens);
 
-        uint256 receivedDAI;
+        uint256 receivedUSDC;
 
-        (, , receivedDAI, ) = __kyberTrade(token, _donationInTokens, dai);
+        (, , receivedUSDC, ) = __kyberTrade(token, _donationInTokens, usdc);
 
-        // if DAI value is greater than the amount required, return excess DAI to msg.sender
-        uint256 donationInDAI = newManagerKairo.mul(kairoPrice).div(PRECISION);
-        if (receivedDAI > donationInDAI) {
-            dai.safeTransfer(msg.sender, receivedDAI.sub(donationInDAI));
-            receivedDAI = donationInDAI;
+        // if USDC value is greater than the amount required, return excess USDC to msg.sender
+        uint256 donationInUSDC = newManagerRepToken.mul(reptokenPrice).div(PRECISION);
+        if (receivedUSDC > donationInUSDC) {
+            usdc.safeTransfer(msg.sender, receivedUSDC.sub(donationInUSDC));
+            receivedUSDC = donationInUSDC;
         }
 
         // register new manager
-        __register(receivedDAI);
+        __register(receivedUSDC);
     }
 
-    function peakAdminRegisterManager(address _manager, uint256 _kairoAmount)
+    function peakAdminRegisterManager(address _manager, uint256 _reptokenAmount)
         public
         during(CyclePhase.Intermission)
         nonReentrant
@@ -432,19 +432,19 @@ contract BetokenLogic2 is
     {
         require(isPermissioned);
 
-        // mint KRO for msg.sender
-        require(cToken.generateTokens(_manager, _kairoAmount));
+        // mint REP for msg.sender
+        require(cToken.generateTokens(_manager, _reptokenAmount));
 
         // Set risk fallback base stake
         _baseRiskStakeFallback[_manager] = _baseRiskStakeFallback[_manager].add(
-            _kairoAmount
+            _reptokenAmount
         );
 
         // Set last active cycle for msg.sender to be the current cycle
         _lastActiveCycle[_manager] = cycleNumber;
 
         // emit events
-        emit Register(_manager, 0, _kairoAmount);
+        emit Register(_manager, 0, _reptokenAmount);
     }
 
     /**
@@ -459,13 +459,13 @@ contract BetokenLogic2 is
         isValidToken(_tokenAddr)
     {
         ERC20Detailed token = ERC20Detailed(_tokenAddr);
-        (, , uint256 actualDAIReceived, ) = __oneInchTrade(
+        (, , uint256 actualUSDCReceived, ) = __oneInchTrade(
             token,
             getBalance(token, address(this)),
-            dai,
+            usdc,
             _calldata
         );
-        totalFundsInDAI = totalFundsInDAI.add(actualDAIReceived);
+        totalFundsInUSDC = totalFundsInUSDC.add(actualUSDCReceived);
     }
 
     /**
@@ -484,62 +484,62 @@ contract BetokenLogic2 is
 
         // Sell short order
         // Not using outputAmount returned by order.sellOrder() because _orderAddress could point to a malicious contract
-        uint256 beforeDAIBalance = dai.balanceOf(address(this));
+        uint256 beforeUSDCBalance = usdc.balanceOf(address(this));
         order.sellOrder(0, MAX_QTY);
-        uint256 actualDAIReceived = dai.balanceOf(address(this)).sub(
-            beforeDAIBalance
+        uint256 actualUSDCReceived = usdc.balanceOf(address(this)).sub(
+            beforeUSDCBalance
         );
 
-        totalFundsInDAI = totalFundsInDAI.add(actualDAIReceived);
+        totalFundsInUSDC = totalFundsInUSDC.add(actualUSDCReceived);
     }
 
     /**
      * @notice Registers `msg.sender` as a manager.
-     * @param _donationInDAI the amount of DAI to be used for registration
+     * @param _donationInUSDC the amount of USDC to be used for registration
      */
-    function __register(uint256 _donationInDAI) internal {
+    function __register(uint256 _donationInUSDC) internal {
         require(
             cToken.balanceOf(msg.sender) == 0 &&
                 userInvestments[msg.sender].length == 0 &&
                 userCompoundOrders[msg.sender].length == 0
         ); // each address can only join once
 
-        // mint KRO for msg.sender
-        uint256 kroAmount = _donationInDAI.mul(PRECISION).div(kairoPrice);
-        require(cToken.generateTokens(msg.sender, kroAmount));
+        // mint REP for msg.sender
+        uint256 repAmount = _donationInUSDC.mul(PRECISION).div(reptokenPrice);
+        require(cToken.generateTokens(msg.sender, repAmount));
 
         // Set risk fallback base stake
-        _baseRiskStakeFallback[msg.sender] = kroAmount;
+        _baseRiskStakeFallback[msg.sender] = repAmount;
 
         // Set last active cycle for msg.sender to be the current cycle
         _lastActiveCycle[msg.sender] = cycleNumber;
 
-        // keep DAI in the fund
-        totalFundsInDAI = totalFundsInDAI.add(_donationInDAI);
+        // keep USDC in the fund
+        totalFundsInUSDC = totalFundsInUSDC.add(_donationInUSDC);
 
         // emit events
-        emit Register(msg.sender, _donationInDAI, kroAmount);
+        emit Register(msg.sender, _donationInUSDC, repAmount);
     }
 
     /**
-     * @notice Handles deposits by minting Betoken Shares & updating total funds.
-     * @param _depositDAIAmount The amount of the deposit in DAI
+     * @notice Handles deposits by minting PeakDeFi Shares & updating total funds.
+     * @param _depositUSDCAmount The amount of the deposit in USDC
      * @param _referrer The deposit referrer
      */
-    function __deposit(uint256 _depositDAIAmount, address _referrer) internal {
+    function __deposit(uint256 _depositUSDCAmount, address _referrer) internal {
         // Register investment and give shares
         uint256 shareAmount;
-        if (sToken.totalSupply() == 0 || totalFundsInDAI == 0) {
-            shareAmount = _depositDAIAmount;
+        if (sToken.totalSupply() == 0 || totalFundsInUSDC == 0) {
+            shareAmount = _depositUSDCAmount;
         } else {
-            shareAmount = _depositDAIAmount.mul(sToken.totalSupply()).div(
-                totalFundsInDAI
+            shareAmount = _depositUSDCAmount.mul(sToken.totalSupply()).div(
+                totalFundsInUSDC
             );
         }
         require(sToken.generateTokens(msg.sender, shareAmount));
-        totalFundsInDAI = totalFundsInDAI.add(_depositDAIAmount);
+        totalFundsInUSDC = totalFundsInUSDC.add(_depositUSDCAmount);
         totalFundsAtManagePhaseStart = totalFundsAtManagePhaseStart.add(
-            _depositDAIAmount
+            _depositUSDCAmount
         );
 
         // Handle peakReferralToken
@@ -555,16 +555,16 @@ contract BetokenLogic2 is
     }
 
     /**
-     * @notice Handles deposits by burning Betoken Shares & updating total funds.
-     * @param _withdrawDAIAmount The amount of the withdrawal in DAI
+     * @notice Handles deposits by burning PeakDeFi Shares & updating total funds.
+     * @param _withdrawUSDCAmount The amount of the withdrawal in USDC
      */
-    function __withdraw(uint256 _withdrawDAIAmount) internal {
+    function __withdraw(uint256 _withdrawUSDCAmount) internal {
         // Burn Shares
-        uint256 shareAmount = _withdrawDAIAmount.mul(sToken.totalSupply()).div(
-            totalFundsInDAI
+        uint256 shareAmount = _withdrawUSDCAmount.mul(sToken.totalSupply()).div(
+            totalFundsInUSDC
         );
         require(sToken.destroyTokens(msg.sender, shareAmount));
-        totalFundsInDAI = totalFundsInDAI.sub(_withdrawDAIAmount);
+        totalFundsInUSDC = totalFundsInUSDC.sub(_withdrawUSDCAmount);
 
         // Handle peakReferralToken
         address actualReferrer = peakReward.referrerOf(msg.sender);

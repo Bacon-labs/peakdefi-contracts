@@ -12,11 +12,11 @@ contract CompoundOrderFactory is CloneFactory {
   address public LONG_CERC20_LOGIC_CONTRACT;
   address public LONG_CEther_LOGIC_CONTRACT;
 
-  address public DAI_ADDR;
+  address public USDC_ADDR;
   address payable public KYBER_ADDR;
   address public COMPTROLLER_ADDR;
   address public ORACLE_ADDR;
-  address public CDAI_ADDR;
+  address public CUSDC_ADDR;
   address public CETH_ADDR;
 
   constructor(
@@ -24,11 +24,11 @@ contract CompoundOrderFactory is CloneFactory {
     address _shortCEtherLogicContract,
     address _longCERC20LogicContract,
     address _longCEtherLogicContract,
-    address _daiAddr,
+    address _usdcAddr,
     address payable _kyberAddr,
     address _comptrollerAddr,
     address _priceOracleAddr,
-    address _cDAIAddr,
+    address _cUSDCAddr,
     address _cETHAddr
   ) public {
     SHORT_CERC20_LOGIC_CONTRACT = _shortCERC20LogicContract;
@@ -36,11 +36,11 @@ contract CompoundOrderFactory is CloneFactory {
     LONG_CERC20_LOGIC_CONTRACT = _longCERC20LogicContract;
     LONG_CEther_LOGIC_CONTRACT = _longCEtherLogicContract;
 
-    DAI_ADDR = _daiAddr;
+    USDC_ADDR = _usdcAddr;
     KYBER_ADDR = _kyberAddr;
     COMPTROLLER_ADDR = _comptrollerAddr;
     ORACLE_ADDR = _priceOracleAddr;
-    CDAI_ADDR = _cDAIAddr;
+    CUSDC_ADDR = _cUSDCAddr;
     CETH_ADDR = _cETHAddr;
   }
 
@@ -48,8 +48,8 @@ contract CompoundOrderFactory is CloneFactory {
     address _compoundTokenAddr,
     uint256 _cycleNumber,
     uint256 _stake,
-    uint256 _collateralAmountInDAI,
-    uint256 _loanAmountInDAI,
+    uint256 _collateralAmountInUSDC,
+    uint256 _loanAmountInUSDC,
     bool _orderType
   ) external returns (CompoundOrder) {
     require(_compoundTokenAddr != address(0));
@@ -75,8 +75,8 @@ contract CompoundOrderFactory is CloneFactory {
       }
     }
     order = CompoundOrder(clone);
-    order.init(_compoundTokenAddr, _cycleNumber, _stake, _collateralAmountInDAI, _loanAmountInDAI, _orderType,
-      DAI_ADDR, KYBER_ADDR, COMPTROLLER_ADDR, ORACLE_ADDR, CDAI_ADDR, CETH_ADDR);
+    order.init(_compoundTokenAddr, _cycleNumber, _stake, _collateralAmountInUSDC, _loanAmountInUSDC, _orderType,
+      USDC_ADDR, KYBER_ADDR, COMPTROLLER_ADDR, ORACLE_ADDR, CUSDC_ADDR, CETH_ADDR);
     order.transferOwnership(msg.sender);
     return order;
   }

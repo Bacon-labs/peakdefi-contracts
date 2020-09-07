@@ -1,9 +1,9 @@
 pragma solidity 0.5.17;
 
-import "./BetokenStorage.sol";
+import "./PeakDeFiStorage.sol";
 
-contract BetokenLogic3 is
-    BetokenStorage,
+contract PeakDeFiLogic3 is
+    PeakDeFiStorage,
     Utils(address(0), address(0), address(0))
 {
     /**
@@ -40,7 +40,7 @@ contract BetokenLogic3 is
             // check whether ready for starting cycle
             isInitialized = true;
             require(proxyAddr != address(0)); // has initialized proxy
-            require(proxy.betokenFundAddress() == address(this)); // upgrade complete
+            require(proxy.peakdefiFundAddress() == address(this)); // upgrade complete
             require(hasInitializedTokenListings); // has initialized token listings
 
             // execute initialization function
@@ -49,7 +49,7 @@ contract BetokenLogic3 is
             require(
                 previousVersion == address(0) ||
                     (previousVersion != address(0) &&
-                        getBalance(dai, address(this)) > 0)
+                        getBalance(usdc, address(this)) > 0)
             ); // has transfered assets from previous version
         } else {
             // normal phase changing
@@ -57,12 +57,12 @@ contract BetokenLogic3 is
                 require(hasFinalizedNextVersion == false); // Shouldn't progress to next phase if upgrading
 
                 // Update total funds at management phase's beginning
-                totalFundsAtManagePhaseStart = totalFundsInDAI;
+                totalFundsAtManagePhaseStart = totalFundsInUSDC;
 
                 // reset number of managers onboarded
                 managersOnboardedThisCycle = 0;
             } else if (cyclePhase == CyclePhase.Manage) {
-                // Burn any Kairo left in BetokenFund's account
+                // Burn any RepToken left in PeakDeFiFund's account
                 require(
                     cToken.destroyTokens(
                         address(this),
@@ -74,25 +74,25 @@ contract BetokenLogic3 is
                 uint256 profit = 0;
 
 
-                    uint256 daiBalanceAtManagePhaseStart
+                    uint256 usdcBalanceAtManagePhaseStart
                  = totalFundsAtManagePhaseStart.add(totalCommissionLeft);
                 if (
-                    getBalance(dai, address(this)) >
-                    daiBalanceAtManagePhaseStart
+                    getBalance(usdc, address(this)) >
+                    usdcBalanceAtManagePhaseStart
                 ) {
-                    profit = getBalance(dai, address(this)).sub(
-                        daiBalanceAtManagePhaseStart
+                    profit = getBalance(usdc, address(this)).sub(
+                        usdcBalanceAtManagePhaseStart
                     );
                 }
 
-                totalFundsInDAI = getBalance(dai, address(this))
+                totalFundsInUSDC = getBalance(usdc, address(this))
                     .sub(totalCommissionLeft)
                     .sub(peakReferralTotalCommissionLeft);
 
                 // Calculate manager commissions
                 uint256 commissionThisCycle = COMMISSION_RATE
                     .mul(profit)
-                    .add(ASSET_FEE_RATE.mul(totalFundsInDAI))
+                    .add(ASSET_FEE_RATE.mul(totalFundsInUSDC))
                     .div(PRECISION);
                 _totalCommissionOfCycle[cycleNumber] = totalCommissionOfCycle(
                     cycleNumber
@@ -115,11 +115,11 @@ contract BetokenLogic3 is
                 peakReferralTotalCommissionLeft = peakReferralTotalCommissionLeft
                     .add(peakReferralCommissionThisCycle);
 
-                totalFundsInDAI = getBalance(dai, address(this))
+                totalFundsInUSDC = getBalance(usdc, address(this))
                     .sub(totalCommissionLeft)
                     .sub(peakReferralTotalCommissionLeft);
 
-                // Give the developer Betoken shares inflation funding
+                // Give the developer PeakDeFi shares inflation funding
                 uint256 devFunding = devFundingRate
                     .mul(sToken.totalSupply())
                     .div(PRECISION);
@@ -167,7 +167,7 @@ contract BetokenLogic3 is
             cycleNumber,
             uint256(cyclePhase),
             now,
-            totalFundsInDAI
+            totalFundsInUSDC
         );
     }
 
@@ -180,8 +180,8 @@ contract BetokenLogic3 is
         // load values from previous version
         totalCommissionLeft = previousVersion == address(0)
             ? 0
-            : BetokenStorage(previousVersion).totalCommissionLeft();
-        totalFundsInDAI = getBalance(dai, address(this)).sub(
+            : PeakDeFiStorage(previousVersion).totalCommissionLeft();
+        totalFundsInUSDC = getBalance(usdc, address(this)).sub(
             totalCommissionLeft
         );
     }
@@ -218,7 +218,7 @@ contract BetokenLogic3 is
 
     /**
      * @notice Returns the commission balance of `_manager`
-     * @return the commission balance and the received penalty, denoted in DAI
+     * @return the commission balance and the received penalty, denoted in USDC
      */
     function commissionBalanceOf(address _manager)
         public
@@ -242,7 +242,7 @@ contract BetokenLogic3 is
 
     /**
      * @notice Returns the commission amount received by `_manager` in the `_cycle`th cycle
-     * @return the commission amount and the received penalty, denoted in DAI
+     * @return the commission amount and the received penalty, denoted in USDC
      */
     function commissionOfAt(address _manager, uint256 _cycle)
         public
@@ -253,14 +253,14 @@ contract BetokenLogic3 is
             return (0, 0);
         }
         // take risk into account
-        uint256 baseKairoBalance = cToken.balanceOfAt(
+        uint256 baseRepTokenBalance = cToken.balanceOfAt(
             _manager,
             managePhaseEndBlock(_cycle.sub(1))
         );
-        uint256 baseStake = baseKairoBalance == 0
+        uint256 baseStake = baseRepTokenBalance == 0
             ? baseRiskStakeFallback(_manager)
-            : baseKairoBalance;
-        if (baseKairoBalance == 0 && baseRiskStakeFallback(_manager) == 0) {
+            : baseRepTokenBalance;
+        if (baseRepTokenBalance == 0 && baseRiskStakeFallback(_manager) == 0) {
             return (0, 0);
         }
         uint256 riskTakenProportion = riskTakenInCycle(_manager, _cycle)
@@ -296,20 +296,20 @@ contract BetokenLogic3 is
             emit Deposit(
                 cycleNumber,
                 msg.sender,
-                DAI_ADDR,
+                USDC_ADDR,
                 commission,
                 commission,
                 now
             );
         } else {
-            // Transfer the commission in DAI
-            dai.safeTransfer(msg.sender, commission);
+            // Transfer the commission in USDC
+            usdc.safeTransfer(msg.sender, commission);
         }
     }
 
     /**
      * @notice Redeems commission for a particular cycle.
-     * @param _inShares true to redeem in Betoken Shares, false to redeem in DAI
+     * @param _inShares true to redeem in PeakDeFi Shares, false to redeem in USDC
      * @param _cycle the cycle for which the commission will be redeemed.
      *        Commissions for a cycle will be redeemed during the Intermission phase of the next cycle, so _cycle must < cycleNumber.
      */
@@ -330,14 +330,14 @@ contract BetokenLogic3 is
             emit Deposit(
                 cycleNumber,
                 msg.sender,
-                DAI_ADDR,
+                USDC_ADDR,
                 commission,
                 commission,
                 now
             );
         } else {
-            // Transfer the commission in DAI
-            dai.safeTransfer(msg.sender, commission);
+            // Transfer the commission in USDC
+            usdc.safeTransfer(msg.sender, commission);
         }
     }
 
@@ -406,24 +406,24 @@ contract BetokenLogic3 is
     }
 
     /**
-     * @notice Handles deposits by minting Betoken Shares & updating total funds.
-     * @param _depositDAIAmount The amount of the deposit in DAI
+     * @notice Handles deposits by minting PeakDeFi Shares & updating total funds.
+     * @param _depositUSDCAmount The amount of the deposit in USDC
      */
-    function __deposit(uint256 _depositDAIAmount) internal {
+    function __deposit(uint256 _depositUSDCAmount) internal {
         // Register investment and give shares
-        if (sToken.totalSupply() == 0 || totalFundsInDAI == 0) {
-            require(sToken.generateTokens(msg.sender, _depositDAIAmount));
+        if (sToken.totalSupply() == 0 || totalFundsInUSDC == 0) {
+            require(sToken.generateTokens(msg.sender, _depositUSDCAmount));
         } else {
             require(
                 sToken.generateTokens(
                     msg.sender,
-                    _depositDAIAmount.mul(sToken.totalSupply()).div(
-                        totalFundsInDAI
+                    _depositUSDCAmount.mul(sToken.totalSupply()).div(
+                        totalFundsInUSDC
                     )
                 )
             );
         }
-        totalFundsInDAI = totalFundsInDAI.add(_depositDAIAmount);
+        totalFundsInUSDC = totalFundsInUSDC.add(_depositUSDCAmount);
     }
 
     /**
@@ -432,7 +432,7 @@ contract BetokenLogic3 is
 
     /**
      * @notice Returns the commission balance of `_referrer`
-     * @return the commission balance, denoted in DAI
+     * @return the commission balance, denoted in USDC
      */
     function peakReferralCommissionBalanceOf(address _referrer)
         public
@@ -454,7 +454,7 @@ contract BetokenLogic3 is
 
     /**
      * @notice Returns the commission amount received by `_referrer` in the `_cycle`th cycle
-     * @return the commission amount, denoted in DAI
+     * @return the commission amount, denoted in USDC
      */
     function peakReferralCommissionOfAt(address _referrer, uint256 _cycle)
         public
@@ -481,9 +481,9 @@ contract BetokenLogic3 is
     {
         uint256 commission = __peakReferralRedeemCommission();
 
-        // Transfer the commission in DAI
-        dai.safeApprove(address(peakReward), commission);
-        peakReward.payCommission(msg.sender, address(dai), commission, false);
+        // Transfer the commission in USDC
+        usdc.safeApprove(address(peakReward), commission);
+        peakReward.payCommission(msg.sender, address(usdc), commission, false);
     }
 
     /**
@@ -500,9 +500,9 @@ contract BetokenLogic3 is
 
         uint256 commission = __peakReferralRedeemCommissionForCycle(_cycle);
 
-        // Transfer the commission in DAI
-        dai.safeApprove(address(peakReward), commission);
-        peakReward.payCommission(msg.sender, address(dai), commission, false);
+        // Transfer the commission in USDC
+        usdc.safeApprove(address(peakReward), commission);
+        peakReward.payCommission(msg.sender, address(usdc), commission, false);
     }
 
     /**

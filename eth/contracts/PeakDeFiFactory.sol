@@ -2,54 +2,54 @@ pragma solidity 0.5.17;
 
 import "./lib/CloneFactory.sol";
 import "./tokens/minime/MiniMeToken.sol";
-import "./BetokenFund.sol";
-import "./BetokenProxy.sol";
+import "./PeakDeFiFund.sol";
+import "./PeakDeFiProxy.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-contract BetokenFactory is CloneFactory {
+contract PeakDeFiFactory is CloneFactory {
     using Address for address;
 
     event CreateFund(address fund);
     event InitFund(address fund, address proxy);
 
-    address public daiAddr;
+    address public usdcAddr;
     address payable public kyberAddr;
     address payable public oneInchAddr;
-    address payable public betokenFund;
-    address public betokenLogic;
-    address public betokenLogic2;
-    address public betokenLogic3;
+    address payable public peakdefiFund;
+    address public peakdefiLogic;
+    address public peakdefiLogic2;
+    address public peakdefiLogic3;
     address public peakRewardAddr;
     address public peakStakingAddr;
     MiniMeTokenFactory public minimeFactory;
 
     constructor(
-        address _daiAddr,
+        address _usdcAddr,
         address payable _kyberAddr,
         address payable _oneInchAddr,
-        address payable _betokenFund,
-        address _betokenLogic,
-        address _betokenLogic2,
-        address _betokenLogic3,
+        address payable _peakdefiFund,
+        address _peakdefiLogic,
+        address _peakdefiLogic2,
+        address _peakdefiLogic3,
         address _peakRewardAddr,
         address _peakStakingAddr,
         address _minimeFactoryAddr
     ) public {
-        daiAddr = _daiAddr;
+        usdcAddr = _usdcAddr;
         kyberAddr = _kyberAddr;
         oneInchAddr = _oneInchAddr;
-        betokenFund = _betokenFund;
-        betokenLogic = _betokenLogic;
-        betokenLogic2 = _betokenLogic2;
-        betokenLogic3 = _betokenLogic3;
+        peakdefiFund = _peakdefiFund;
+        peakdefiLogic = _peakdefiLogic;
+        peakdefiLogic2 = _peakdefiLogic2;
+        peakdefiLogic3 = _peakdefiLogic3;
         peakRewardAddr = _peakRewardAddr;
         peakStakingAddr = _peakStakingAddr;
         minimeFactory = MiniMeTokenFactory(_minimeFactoryAddr);
     }
 
-    function createFund() external returns (BetokenFund) {
+    function createFund() external returns (PeakDeFiFund) {
         // create fund
-        BetokenFund fund = BetokenFund(createClone(betokenFund).toPayable());
+        PeakDeFiFund fund = PeakDeFiFund(createClone(peakdefiFund).toPayable());
         fund.initOwner();
 
         // give PeakReward signer rights to fund
@@ -62,19 +62,19 @@ contract BetokenFactory is CloneFactory {
     }
 
     function initFund1(
-        BetokenFund fund,
-        string calldata kairoName,
-        string calldata kairoSymbol,
+        PeakDeFiFund fund,
+        string calldata reptokenName,
+        string calldata reptokenSymbol,
         string calldata sharesName,
         string calldata sharesSymbol
     ) external {
         // create tokens
-        MiniMeToken kairo = minimeFactory.createCloneToken(
+        MiniMeToken reptoken = minimeFactory.createCloneToken(
             address(0),
             0,
-            kairoName,
+            reptokenName,
             18,
-            kairoSymbol,
+            reptokenSymbol,
             false
         );
         MiniMeToken shares = minimeFactory.createCloneToken(
@@ -95,19 +95,19 @@ contract BetokenFactory is CloneFactory {
         );
 
         // transfer token ownerships to fund
-        kairo.transferOwnership(address(fund));
+        reptoken.transferOwnership(address(fund));
         shares.transferOwnership(address(fund));
         peakReferralToken.transferOwnership(address(fund));
 
         fund.initInternalTokens(
-            address(kairo),
+            address(reptoken),
             address(shares),
             address(peakReferralToken)
         );
     }
 
     function initFund2(
-        BetokenFund fund,
+        PeakDeFiFund fund,
         address[] calldata _kyberTokens,
         address[] calldata _compoundTokens
     ) external {
@@ -115,24 +115,24 @@ contract BetokenFactory is CloneFactory {
     }
 
     function initFund3(
-        BetokenFund fund,
-        uint256 _newManagerKairo,
+        PeakDeFiFund fund,
+        uint256 _newManagerRepToken,
         uint256 _maxNewManagersPerCycle,
-        uint256 _kairoPrice,
+        uint256 _reptokenPrice,
         uint256 _peakManagerStakeRequired,
         bool _isPermissioned
     ) external {
         fund.initRegistration(
-            _newManagerKairo,
+            _newManagerRepToken,
             _maxNewManagersPerCycle,
-            _kairoPrice,
+            _reptokenPrice,
             _peakManagerStakeRequired,
             _isPermissioned
         );
     }
 
     function initFund4(
-        BetokenFund fund,
+        PeakDeFiFund fund,
         address payable _devFundingAccount,
         uint256 _devFundingRate,
         uint256[2] calldata _phaseLengths,
@@ -143,20 +143,20 @@ contract BetokenFactory is CloneFactory {
             _phaseLengths,
             _devFundingRate,
             address(0),
-            daiAddr,
+            usdcAddr,
             kyberAddr,
             _compoundFactoryAddr,
-            betokenLogic,
-            betokenLogic2,
-            betokenLogic3,
+            peakdefiLogic,
+            peakdefiLogic2,
+            peakdefiLogic3,
             1,
             oneInchAddr,
             peakRewardAddr,
             peakStakingAddr
         );
 
-        // deploy and set BetokenProxy
-        BetokenProxy proxy = new BetokenProxy(address(fund));
+        // deploy and set PeakDeFiProxy
+        PeakDeFiProxy proxy = new PeakDeFiProxy(address(fund));
         fund.setProxy(address(proxy).toPayable());
 
         // transfer fund ownership to msg.sender

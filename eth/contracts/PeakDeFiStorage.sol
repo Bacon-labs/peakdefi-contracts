@@ -6,15 +6,15 @@ import "./lib/ReentrancyGuard.sol";
 import "./interfaces/IMiniMeToken.sol";
 import "./tokens/minime/TokenController.sol";
 import "./Utils.sol";
-import "./BetokenProxyInterface.sol";
+import "./PeakDeFiProxyInterface.sol";
 import "./peak/reward/PeakReward.sol";
 import "./peak/staking/PeakStaking.sol";
 
 /**
- * @title The storage layout of BetokenFund
+ * @title The storage layout of PeakDeFiFund
  * @author Zefram Lou (Zebang Liu)
  */
-contract BetokenStorage is Ownable, ReentrancyGuard {
+contract PeakDeFiStorage is Ownable, ReentrancyGuard {
     using SafeMath for uint256;
 
     enum CyclePhase {Intermission, Manage}
@@ -26,24 +26,24 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
         uint256 cycleNumber;
         uint256 stake;
         uint256 tokenAmount;
-        uint256 buyPrice; // token buy price in 18 decimals in DAI
-        uint256 sellPrice; // token sell price in 18 decimals in DAI
+        uint256 buyPrice; // token buy price in 18 decimals in USDC
+        uint256 sellPrice; // token sell price in 18 decimals in USDC
         uint256 buyTime;
-        uint256 buyCostInDAI;
+        uint256 buyCostInUSDC;
         bool isSold;
     }
 
     // Fund parameters
-    uint256 public constant COMMISSION_RATE = 15 * (10**16); // The proportion of profits that gets distributed to Kairo holders every cycle.
-    uint256 public constant ASSET_FEE_RATE = 1 * (10**15); // The proportion of fund balance that gets distributed to Kairo holders every cycle.
-    uint256 public constant NEXT_PHASE_REWARD = 1 * (10**18); // Amount of Kairo rewarded to the user who calls nextPhase().
+    uint256 public constant COMMISSION_RATE = 15 * (10**16); // The proportion of profits that gets distributed to RepToken holders every cycle.
+    uint256 public constant ASSET_FEE_RATE = 1 * (10**15); // The proportion of fund balance that gets distributed to RepToken holders every cycle.
+    uint256 public constant NEXT_PHASE_REWARD = 1 * (10**18); // Amount of RepToken rewarded to the user who calls nextPhase().
     uint256 public constant COLLATERAL_RATIO_MODIFIER = 75 * (10**16); // Modifies Compound's collateral ratio, gets 2:1 from 1.5:1 ratio
-    uint256 public constant MIN_RISK_TIME = 3 days; // Mininum risk taken to get full commissions is 9 days * kairoBalance
-    uint256 public constant INACTIVE_THRESHOLD = 2; // Number of inactive cycles after which a manager's Kairo balance can be burned
+    uint256 public constant MIN_RISK_TIME = 3 days; // Mininum risk taken to get full commissions is 9 days * reptokenBalance
+    uint256 public constant INACTIVE_THRESHOLD = 2; // Number of inactive cycles after which a manager's RepToken balance can be burned
     uint256 public constant ROI_PUNISH_THRESHOLD = 1 * (10**17); // ROI worse than 10% will see punishment in stake
     uint256 public constant ROI_BURN_THRESHOLD = 25 * (10**16); // ROI worse than 25% will see their stake all burned
-    uint256 public constant ROI_PUNISH_SLOPE = 6; // kroROI = -(6 * absROI - 0.5)
-    uint256 public constant ROI_PUNISH_NEG_BIAS = 5 * (10**17); // kroROI = -(6 * absROI - 0.5)
+    uint256 public constant ROI_PUNISH_SLOPE = 6; // repROI = -(6 * absROI - 0.5)
+    uint256 public constant ROI_PUNISH_NEG_BIAS = 5 * (10**17); // repROI = -(6 * absROI - 0.5)
     uint256 public constant PEAK_COMMISSION_RATE = 20 * (10**16); // The proportion of profits that gets distributed to PeakDeFi referrers every cycle.
 
     // Instance variables
@@ -54,34 +54,34 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
     // Checks if the fund has been initialized
     bool public isInitialized;
 
-    // Address of the Kairo token contract.
+    // Address of the RepToken token contract.
     address public controlTokenAddr;
 
     // Address of the share token contract.
     address public shareTokenAddr;
 
-    // Address of the BetokenProxy contract.
+    // Address of the PeakDeFiProxy contract.
     address payable public proxyAddr;
 
     // Address of the CompoundOrderFactory contract.
     address public compoundFactoryAddr;
 
-    // Address of the BetokenLogic contract.
-    address public betokenLogic;
-    address public betokenLogic2;
-    address public betokenLogic3;
+    // Address of the PeakDeFiLogic contract.
+    address public peakdefiLogic;
+    address public peakdefiLogic2;
+    address public peakdefiLogic3;
 
     // Address to which the development team funding will be sent.
     address payable public devFundingAccount;
 
-    // Address of the previous version of BetokenFund.
+    // Address of the previous version of PeakDeFiFund.
     address payable public previousVersion;
 
     // The number of the current investment cycle.
     uint256 public cycleNumber;
 
     // The amount of funds held by the fund.
-    uint256 public totalFundsInDAI;
+    uint256 public totalFundsInUSDC;
 
     // The total funds at the beginning of the current management phase
     uint256 public totalFundsAtManagePhaseStart;
@@ -89,7 +89,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
     // The start time for the current investment cycle phase, in seconds since Unix epoch.
     uint256 public startTimeOfCyclePhase;
 
-    // The proportion of Betoken Shares total supply to mint and use for funding the development team. Fixed point decimal.
+    // The proportion of PeakDeFi Shares total supply to mint and use for funding the development team. Fixed point decimal.
     uint256 public devFundingRate;
 
     // Total amount of commission unclaimed by managers
@@ -101,14 +101,14 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
     // The number of managers onboarded during the current cycle
     uint256 public managersOnboardedThisCycle;
 
-    // The amount of Kairo tokens a new manager receves
-    uint256 public newManagerKairo;
+    // The amount of RepToken tokens a new manager receves
+    uint256 public newManagerRepToken;
 
     // The max number of new managers that can be onboarded in one cycle
     uint256 public maxNewManagersPerCycle;
 
-    // The price of Kairo in DAI
-    uint256 public kairoPrice;
+    // The price of RepToken in USDC
+    uint256 public reptokenPrice;
 
     // The last cycle where a user redeemed all of their remaining commission.
     mapping(address => uint256) internal _lastCommissionRedemption;
@@ -141,7 +141,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
     // Checks if an address points to a whitelisted Kyber token.
     mapping(address => bool) public isKyberToken;
 
-    // Checks if an address points to a whitelisted Compound token. Returns false for cDAI and other stablecoin CompoundTokens.
+    // Checks if an address points to a whitelisted Compound token. Returns false for cUSDC and other stablecoin CompoundTokens.
     mapping(address => bool) public isCompoundToken;
 
     // The current cycle phase.
@@ -149,12 +149,12 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
 
     // Upgrade governance related variables
     bool public hasFinalizedNextVersion; // Denotes if the address of the next smart contract version has been finalized
-    address payable public nextVersion; // Address of the next version of BetokenFund.
+    address payable public nextVersion; // Address of the next version of PeakDeFiFund.
 
     // Contract instances
     IMiniMeToken internal cToken;
     IMiniMeToken internal sToken;
-    BetokenProxyInterface internal proxy;
+    PeakDeFiProxyInterface internal proxy;
 
     // PeakDeFi
     uint256 public peakReferralTotalCommissionLeft;
@@ -175,7 +175,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
         uint256 indexed _cycleNumber,
         uint256 indexed _newPhase,
         uint256 _timestamp,
-        uint256 _totalFundsInDAI
+        uint256 _totalFundsInUSDC
     );
 
     event Deposit(
@@ -183,7 +183,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
         address indexed _sender,
         address _tokenAddress,
         uint256 _tokenAmount,
-        uint256 _daiAmount,
+        uint256 _usdcAmount,
         uint256 _timestamp
     );
     event Withdraw(
@@ -191,7 +191,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
         address indexed _sender,
         address _tokenAddress,
         uint256 _tokenAmount,
-        uint256 _daiAmount,
+        uint256 _usdcAmount,
         uint256 _timestamp
     );
 
@@ -202,7 +202,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
         address _tokenAddress,
         uint256 _stakeInWeis,
         uint256 _buyPrice,
-        uint256 _costDAIAmount,
+        uint256 _costUSDCAmount,
         uint256 _tokenAmount
     );
     event SoldInvestment(
@@ -210,9 +210,9 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
         address indexed _sender,
         uint256 _id,
         address _tokenAddress,
-        uint256 _receivedKairo,
+        uint256 _receivedRepToken,
         uint256 _sellPrice,
-        uint256 _earnedDAIAmount
+        uint256 _earnedUSDCAmount
     );
 
     event CreatedCompoundOrder(
@@ -223,7 +223,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
         bool _orderType,
         address _tokenAddress,
         uint256 _stakeInWeis,
-        uint256 _costDAIAmount
+        uint256 _costUSDCAmount
     );
     event SoldCompoundOrder(
         uint256 indexed _cycleNumber,
@@ -232,15 +232,15 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
         address _order,
         bool _orderType,
         address _tokenAddress,
-        uint256 _receivedKairo,
-        uint256 _earnedDAIAmount
+        uint256 _receivedRepToken,
+        uint256 _earnedUSDCAmount
     );
     event RepaidCompoundOrder(
         uint256 indexed _cycleNumber,
         address indexed _sender,
         uint256 _id,
         address _order,
-        uint256 _repaidDAIAmount
+        uint256 _repaidUSDCAmount
     );
 
     event CommissionPaid(
@@ -250,15 +250,15 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
     );
     event TotalCommissionPaid(
         uint256 indexed _cycleNumber,
-        uint256 _totalCommissionInDAI
+        uint256 _totalCommissionInUSDC
     );
 
     event Register(
         address indexed _manager,
-        uint256 _donationInDAI,
-        uint256 _kairoReceived
+        uint256 _donationInUSDC,
+        uint256 _reptokenReceived
     );
-    event BurnDeadman(address indexed _manager, uint256 _kairoBurned);
+    event BurnDeadman(address indexed _manager, uint256 _reptokenBurned);
 
     event DeveloperInitiatedUpgrade(
         uint256 indexed _cycleNumber,
@@ -276,11 +276,11 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
     );
     event PeakReferralTotalCommissionPaid(
         uint256 indexed _cycleNumber,
-        uint256 _totalCommissionInDAI
+        uint256 _totalCommissionInUSDC
     );
 
     /*
-  Helper functions shared by both BetokenLogic & BetokenFund
+  Helper functions shared by both PeakDeFiLogic & PeakDeFiFund
   */
 
     function lastCommissionRedemption(address _manager)
@@ -292,7 +292,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
             return
                 previousVersion == address(0)
                     ? 0
-                    : BetokenStorage(previousVersion).lastCommissionRedemption(
+                    : PeakDeFiStorage(previousVersion).lastCommissionRedemption(
                         _manager
                     );
         }
@@ -308,7 +308,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
             return
                 previousVersion == address(0)
                     ? false
-                    : BetokenStorage(previousVersion)
+                    : PeakDeFiStorage(previousVersion)
                         .hasRedeemedCommissionForCycle(_manager, _cycle);
         }
         return _hasRedeemedCommissionForCycle[_manager][_cycle];
@@ -323,7 +323,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
             return
                 previousVersion == address(0)
                     ? 0
-                    : BetokenStorage(previousVersion).riskTakenInCycle(
+                    : PeakDeFiStorage(previousVersion).riskTakenInCycle(
                         _manager,
                         _cycle
                     );
@@ -340,7 +340,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
             return
                 previousVersion == address(0)
                     ? 0
-                    : BetokenStorage(previousVersion).baseRiskStakeFallback(
+                    : PeakDeFiStorage(previousVersion).baseRiskStakeFallback(
                         _manager
                     );
         }
@@ -356,7 +356,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
             return
                 previousVersion == address(0)
                     ? 0
-                    : BetokenStorage(previousVersion).totalCommissionOfCycle(
+                    : PeakDeFiStorage(previousVersion).totalCommissionOfCycle(
                         _cycle
                     );
         }
@@ -368,7 +368,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
             return
                 previousVersion == address(0)
                     ? 0
-                    : BetokenStorage(previousVersion).managePhaseEndBlock(
+                    : PeakDeFiStorage(previousVersion).managePhaseEndBlock(
                         _cycle
                     );
         }
@@ -380,7 +380,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
             return
                 previousVersion == address(0)
                     ? 0
-                    : BetokenStorage(previousVersion).lastActiveCycle(_manager);
+                    : PeakDeFiStorage(previousVersion).lastActiveCycle(_manager);
         }
         return _lastActiveCycle[_manager];
     }
@@ -397,7 +397,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
             return
                 previousVersion == address(0)
                     ? 0
-                    : BetokenStorage(previousVersion)
+                    : PeakDeFiStorage(previousVersion)
                         .peakReferralLastCommissionRedemption(_manager);
         }
         return _peakReferralLastCommissionRedemption[_manager];
@@ -414,7 +414,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
             return
                 previousVersion == address(0)
                     ? false
-                    : BetokenStorage(previousVersion)
+                    : PeakDeFiStorage(previousVersion)
                         .peakReferralHasRedeemedCommissionForCycle(
                         _manager,
                         _cycle
@@ -432,7 +432,7 @@ contract BetokenStorage is Ownable, ReentrancyGuard {
             return
                 previousVersion == address(0)
                     ? 0
-                    : BetokenStorage(previousVersion)
+                    : PeakDeFiStorage(previousVersion)
                         .peakReferralTotalCommissionOfCycle(_cycle);
         }
         return _peakReferralTotalCommissionOfCycle[_cycle];

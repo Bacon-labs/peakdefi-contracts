@@ -1,14 +1,14 @@
 pragma solidity 0.5.17;
 
-import "./BetokenStorage.sol";
+import "./PeakDeFiStorage.sol";
 import "./derivatives/CompoundOrderFactory.sol";
 
 /**
- * @title The main smart contract of the Betoken hedge fund.
+ * @title The main smart contract of the PeakDeFi hedge fund.
  * @author Zefram Lou (Zebang Liu)
  */
-contract BetokenFund is
-    BetokenStorage,
+contract PeakDeFiFund is
+    PeakDeFiStorage,
     Utils(address(0), address(0), address(0)),
     TokenController
 {
@@ -35,12 +35,12 @@ contract BetokenFund is
         uint256[2] calldata _phaseLengths,
         uint256 _devFundingRate,
         address payable _previousVersion,
-        address _daiAddr,
+        address _usdcAddr,
         address payable _kyberAddr,
         address _compoundFactoryAddr,
-        address _betokenLogic,
-        address _betokenLogic2,
-        address _betokenLogic3,
+        address _peakdefiLogic,
+        address _peakdefiLogic2,
+        address _peakdefiLogic3,
         uint256 _startCycleNumber,
         address payable _oneInchAddr,
         address _peakRewardAddr,
@@ -52,20 +52,20 @@ contract BetokenFund is
         devFundingRate = _devFundingRate;
         cyclePhase = CyclePhase.Intermission;
         compoundFactoryAddr = _compoundFactoryAddr;
-        betokenLogic = _betokenLogic;
-        betokenLogic2 = _betokenLogic2;
-        betokenLogic3 = _betokenLogic3;
+        peakdefiLogic = _peakdefiLogic;
+        peakdefiLogic2 = _peakdefiLogic2;
+        peakdefiLogic3 = _peakdefiLogic3;
         previousVersion = _previousVersion;
         cycleNumber = _startCycleNumber;
 
         peakReward = PeakReward(_peakRewardAddr);
         peakStaking = PeakStaking(_peakStakingAddr);
 
-        DAI_ADDR = _daiAddr;
+        USDC_ADDR = _usdcAddr;
         KYBER_ADDR = _kyberAddr;
         ONEINCH_ADDR = _oneInchAddr;
 
-        dai = ERC20Detailed(_daiAddr);
+        usdc = ERC20Detailed(_usdcAddr);
         kyber = KyberNetwork(_kyberAddr);
 
         __initReentrancyGuard();
@@ -77,30 +77,30 @@ contract BetokenFund is
     }
 
     function initInternalTokens(
-        address payable _kroAddr,
+        address payable _repAddr,
         address payable _sTokenAddr,
         address payable _peakReferralTokenAddr
     ) external onlyOwner {
         require(controlTokenAddr == address(0));
-        require(_kroAddr != address(0));
-        controlTokenAddr = _kroAddr;
+        require(_repAddr != address(0));
+        controlTokenAddr = _repAddr;
         shareTokenAddr = _sTokenAddr;
-        cToken = IMiniMeToken(_kroAddr);
+        cToken = IMiniMeToken(_repAddr);
         sToken = IMiniMeToken(_sTokenAddr);
         peakReferralToken = IMiniMeToken(_peakReferralTokenAddr);
     }
 
     function initRegistration(
-        uint256 _newManagerKairo,
+        uint256 _newManagerRepToken,
         uint256 _maxNewManagersPerCycle,
-        uint256 _kairoPrice,
+        uint256 _reptokenPrice,
         uint256 _peakManagerStakeRequired,
         bool _isPermissioned
     ) external onlyOwner {
-        require(_newManagerKairo > 0 && newManagerKairo == 0);
-        newManagerKairo = _newManagerKairo;
+        require(_newManagerRepToken > 0 && newManagerRepToken == 0);
+        newManagerRepToken = _newManagerRepToken;
         maxNewManagersPerCycle = _maxNewManagersPerCycle;
-        kairoPrice = _kairoPrice;
+        reptokenPrice = _reptokenPrice;
         peakManagerStakeRequired = _peakManagerStakeRequired;
         isPermissioned = _isPermissioned;
     }
@@ -124,14 +124,14 @@ contract BetokenFund is
     }
 
     /**
-     * @notice Used during deployment to set the BetokenProxy contract address.
+     * @notice Used during deployment to set the PeakDeFiProxy contract address.
      * @param _proxyAddr the proxy's address
      */
     function setProxy(address payable _proxyAddr) external onlyOwner {
         require(_proxyAddr != address(0));
         require(proxyAddr == address(0));
         proxyAddr = _proxyAddr;
-        proxy = BetokenProxyInterface(_proxyAddr);
+        proxy = PeakDeFiProxyInterface(_proxyAddr);
     }
 
     /**
@@ -148,7 +148,7 @@ contract BetokenFund is
         public
         returns (bool _success)
     {
-        (bool success, bytes memory result) = betokenLogic3.delegatecall(
+        (bool success, bytes memory result) = peakdefiLogic3.delegatecall(
             abi.encodeWithSelector(
                 this.developerInitiateUpgrade.selector,
                 _candidate
@@ -161,8 +161,8 @@ contract BetokenFund is
     }
 
     /**
-     * @notice Transfers ownership of Kairo & Share token contracts to the next version. Also updates BetokenFund's
-     *         address in BetokenProxy.
+     * @notice Transfers ownership of RepToken & Share token contracts to the next version. Also updates PeakDeFiFund's
+     *         address in PeakDeFiProxy.
      */
     function migrateOwnedContractsToNextVersion()
         public
@@ -171,7 +171,7 @@ contract BetokenFund is
     {
         cToken.transferOwnership(nextVersion);
         sToken.transferOwnership(nextVersion);
-        proxy.updateBetokenFundAddress();
+        proxy.updatePeakDeFiFundAddress();
     }
 
     /**
@@ -234,13 +234,13 @@ contract BetokenFund is
 
     /**
      * @notice Returns the commission balance of `_manager`
-     * @return the commission balance and the received penalty, denoted in DAI
+     * @return the commission balance and the received penalty, denoted in USDC
      */
     function commissionBalanceOf(address _manager)
         public
         returns (uint256 _commission, uint256 _penalty)
     {
-        (bool success, bytes memory result) = betokenLogic3.delegatecall(
+        (bool success, bytes memory result) = peakdefiLogic3.delegatecall(
             abi.encodeWithSelector(this.commissionBalanceOf.selector, _manager)
         );
         if (!success) {
@@ -251,13 +251,13 @@ contract BetokenFund is
 
     /**
      * @notice Returns the commission amount received by `_manager` in the `_cycle`th cycle
-     * @return the commission amount and the received penalty, denoted in DAI
+     * @return the commission amount and the received penalty, denoted in USDC
      */
     function commissionOfAt(address _manager, uint256 _cycle)
         public
         returns (uint256 _commission, uint256 _penalty)
     {
-        (bool success, bytes memory result) = betokenLogic3.delegatecall(
+        (bool success, bytes memory result) = peakdefiLogic3.delegatecall(
             abi.encodeWithSelector(
                 this.commissionOfAt.selector,
                 _manager,
@@ -320,7 +320,7 @@ contract BetokenFund is
      * @notice Moves the fund to the next phase in the investment cycle.
      */
     function nextPhase() public {
-        (bool success, ) = betokenLogic3.delegatecall(
+        (bool success, ) = peakdefiLogic3.delegatecall(
             abi.encodeWithSelector(this.nextPhase.selector)
         );
         if (!success) {
@@ -333,12 +333,12 @@ contract BetokenFund is
      */
 
     /**
-     * @notice Registers `msg.sender` as a manager, using DAI as payment. The more one pays, the more Kairo one gets.
-     *         There's a max Kairo amount that can be bought, and excess payment will be sent back to sender.
+     * @notice Registers `msg.sender` as a manager, using USDC as payment. The more one pays, the more RepToken one gets.
+     *         There's a max RepToken amount that can be bought, and excess payment will be sent back to sender.
      */
-    function registerWithDAI() public {
-        (bool success, ) = betokenLogic2.delegatecall(
-            abi.encodeWithSelector(this.registerWithDAI.selector)
+    function registerWithUSDC() public {
+        (bool success, ) = peakdefiLogic2.delegatecall(
+            abi.encodeWithSelector(this.registerWithUSDC.selector)
         );
         if (!success) {
             revert();
@@ -346,11 +346,11 @@ contract BetokenFund is
     }
 
     /**
-     * @notice Registers `msg.sender` as a manager, using ETH as payment. The more one pays, the more Kairo one gets.
-     *         There's a max Kairo amount that can be bought, and excess payment will be sent back to sender.
+     * @notice Registers `msg.sender` as a manager, using ETH as payment. The more one pays, the more RepToken one gets.
+     *         There's a max RepToken amount that can be bought, and excess payment will be sent back to sender.
      */
     function registerWithETH() public payable {
-        (bool success, ) = betokenLogic2.delegatecall(
+        (bool success, ) = peakdefiLogic2.delegatecall(
             abi.encodeWithSelector(this.registerWithETH.selector)
         );
         if (!success) {
@@ -359,15 +359,15 @@ contract BetokenFund is
     }
 
     /**
-     * @notice Registers `msg.sender` as a manager, using tokens as payment. The more one pays, the more Kairo one gets.
-     *         There's a max Kairo amount that can be bought, and excess payment will be sent back to sender.
+     * @notice Registers `msg.sender` as a manager, using tokens as payment. The more one pays, the more RepToken one gets.
+     *         There's a max RepToken amount that can be bought, and excess payment will be sent back to sender.
      * @param _token the token to be used for payment
      * @param _donationInTokens the amount of tokens to be used for registration, should use the token's native decimals
      */
     function registerWithToken(address _token, uint256 _donationInTokens)
         public
     {
-        (bool success, ) = betokenLogic2.delegatecall(
+        (bool success, ) = peakdefiLogic2.delegatecall(
             abi.encodeWithSelector(
                 this.registerWithToken.selector,
                 _token,
@@ -384,10 +384,10 @@ contract BetokenFund is
      */
 
     /**
-     * @notice Deposit Ether into the fund. Ether will be converted into DAI.
+     * @notice Deposit Ether into the fund. Ether will be converted into USDC.
      */
     function depositEther(address _referrer) public payable {
-        (bool success, ) = betokenLogic2.delegatecall(
+        (bool success, ) = peakdefiLogic2.delegatecall(
             abi.encodeWithSelector(this.depositEther.selector, _referrer)
         );
         if (!success) {
@@ -400,7 +400,7 @@ contract BetokenFund is
         bytes calldata _calldata,
         address _referrer
     ) external payable {
-        (bool success, ) = betokenLogic2.delegatecall(
+        (bool success, ) = peakdefiLogic2.delegatecall(
             abi.encodeWithSelector(
                 this.depositEtherAdvanced.selector,
                 _useKyber,
@@ -414,14 +414,14 @@ contract BetokenFund is
     }
 
     /**
-     * @notice Deposit DAI Stablecoin into the fund.
-     * @param _daiAmount The amount of DAI to be deposited. May be different from actual deposited amount.
+     * @notice Deposit USDC Stablecoin into the fund.
+     * @param _usdcAmount The amount of USDC to be deposited. May be different from actual deposited amount.
      */
-    function depositDAI(uint256 _daiAmount, address _referrer) public {
-        (bool success, ) = betokenLogic2.delegatecall(
+    function depositUSDC(uint256 _usdcAmount, address _referrer) public {
+        (bool success, ) = peakdefiLogic2.delegatecall(
             abi.encodeWithSelector(
-                this.depositDAI.selector,
-                _daiAmount,
+                this.depositUSDC.selector,
+                _usdcAmount,
                 _referrer
             )
         );
@@ -431,7 +431,7 @@ contract BetokenFund is
     }
 
     /**
-     * @notice Deposit ERC20 tokens into the fund. Tokens will be converted into DAI.
+     * @notice Deposit ERC20 tokens into the fund. Tokens will be converted into USDC.
      * @param _tokenAddr the address of the token to be deposited
      * @param _tokenAmount The amount of tokens to be deposited. May be different from actual deposited amount.
      */
@@ -440,7 +440,7 @@ contract BetokenFund is
         uint256 _tokenAmount,
         address _referrer
     ) public {
-        (bool success, ) = betokenLogic2.delegatecall(
+        (bool success, ) = peakdefiLogic2.delegatecall(
             abi.encodeWithSelector(
                 this.depositToken.selector,
                 _tokenAddr,
@@ -460,7 +460,7 @@ contract BetokenFund is
         bytes calldata _calldata,
         address _referrer
     ) external {
-        (bool success, ) = betokenLogic2.delegatecall(
+        (bool success, ) = peakdefiLogic2.delegatecall(
             abi.encodeWithSelector(
                 this.depositTokenAdvanced.selector,
                 _tokenAddr,
@@ -477,11 +477,11 @@ contract BetokenFund is
 
     /**
      * @notice Withdraws Ether by burning Shares.
-     * @param _amountInDAI Amount of funds to be withdrawn expressed in DAI. Fixed-point decimal. May be different from actual amount.
+     * @param _amountInUSDC Amount of funds to be withdrawn expressed in USDC. Fixed-point decimal. May be different from actual amount.
      */
-    function withdrawEther(uint256 _amountInDAI) external {
-        (bool success, ) = betokenLogic2.delegatecall(
-            abi.encodeWithSelector(this.withdrawEther.selector, _amountInDAI)
+    function withdrawEther(uint256 _amountInUSDC) external {
+        (bool success, ) = peakdefiLogic2.delegatecall(
+            abi.encodeWithSelector(this.withdrawEther.selector, _amountInUSDC)
         );
         if (!success) {
             revert();
@@ -489,14 +489,14 @@ contract BetokenFund is
     }
 
     function withdrawEtherAdvanced(
-        uint256 _amountInDAI,
+        uint256 _amountInUSDC,
         bool _useKyber,
         bytes calldata _calldata
     ) external {
-        (bool success, ) = betokenLogic2.delegatecall(
+        (bool success, ) = peakdefiLogic2.delegatecall(
             abi.encodeWithSelector(
                 this.withdrawEtherAdvanced.selector,
-                _amountInDAI,
+                _amountInUSDC,
                 _useKyber,
                 _calldata
             )
@@ -508,11 +508,11 @@ contract BetokenFund is
 
     /**
      * @notice Withdraws Ether by burning Shares.
-     * @param _amountInDAI Amount of funds to be withdrawn expressed in DAI. Fixed-point decimal. May be different from actual amount.
+     * @param _amountInUSDC Amount of funds to be withdrawn expressed in USDC. Fixed-point decimal. May be different from actual amount.
      */
-    function withdrawDAI(uint256 _amountInDAI) public {
-        (bool success, ) = betokenLogic2.delegatecall(
-            abi.encodeWithSelector(this.withdrawDAI.selector, _amountInDAI)
+    function withdrawUSDC(uint256 _amountInUSDC) public {
+        (bool success, ) = peakdefiLogic2.delegatecall(
+            abi.encodeWithSelector(this.withdrawUSDC.selector, _amountInUSDC)
         );
         if (!success) {
             revert();
@@ -522,14 +522,14 @@ contract BetokenFund is
     /**
      * @notice Withdraws funds by burning Shares, and converts the funds into the specified token using Kyber Network.
      * @param _tokenAddr the address of the token to be withdrawn into the caller's account
-     * @param _amountInDAI The amount of funds to be withdrawn expressed in DAI. Fixed-point decimal. May be different from actual amount.
+     * @param _amountInUSDC The amount of funds to be withdrawn expressed in USDC. Fixed-point decimal. May be different from actual amount.
      */
-    function withdrawToken(address _tokenAddr, uint256 _amountInDAI) external {
-        (bool success, ) = betokenLogic2.delegatecall(
+    function withdrawToken(address _tokenAddr, uint256 _amountInUSDC) external {
+        (bool success, ) = peakdefiLogic2.delegatecall(
             abi.encodeWithSelector(
                 this.withdrawToken.selector,
                 _tokenAddr,
-                _amountInDAI
+                _amountInUSDC
             )
         );
         if (!success) {
@@ -539,15 +539,15 @@ contract BetokenFund is
 
     function withdrawTokenAdvanced(
         address _tokenAddr,
-        uint256 _amountInDAI,
+        uint256 _amountInUSDC,
         bool _useKyber,
         bytes calldata _calldata
     ) external {
-        (bool success, ) = betokenLogic2.delegatecall(
+        (bool success, ) = peakdefiLogic2.delegatecall(
             abi.encodeWithSelector(
                 this.withdrawTokenAdvanced.selector,
                 _tokenAddr,
-                _amountInDAI,
+                _amountInUSDC,
                 _useKyber,
                 _calldata
             )
@@ -561,7 +561,7 @@ contract BetokenFund is
      * @notice Redeems commission.
      */
     function redeemCommission(bool _inShares) public {
-        (bool success, ) = betokenLogic3.delegatecall(
+        (bool success, ) = peakdefiLogic3.delegatecall(
             abi.encodeWithSelector(this.redeemCommission.selector, _inShares)
         );
         if (!success) {
@@ -571,12 +571,12 @@ contract BetokenFund is
 
     /**
      * @notice Redeems commission for a particular cycle.
-     * @param _inShares true to redeem in Betoken Shares, false to redeem in DAI
+     * @param _inShares true to redeem in PeakDeFi Shares, false to redeem in USDC
      * @param _cycle the cycle for which the commission will be redeemed.
      *        Commissions for a cycle will be redeemed during the Intermission phase of the next cycle, so _cycle must < cycleNumber.
      */
     function redeemCommissionForCycle(bool _inShares, uint256 _cycle) public {
-        (bool success, ) = betokenLogic3.delegatecall(
+        (bool success, ) = peakdefiLogic3.delegatecall(
             abi.encodeWithSelector(
                 this.redeemCommissionForCycle.selector,
                 _inShares,
@@ -596,7 +596,7 @@ contract BetokenFund is
     function sellLeftoverToken(address _tokenAddr, bytes calldata _calldata)
         external
     {
-        (bool success, ) = betokenLogic2.delegatecall(
+        (bool success, ) = peakdefiLogic2.delegatecall(
             abi.encodeWithSelector(
                 this.sellLeftoverToken.selector,
                 _tokenAddr,
@@ -613,7 +613,7 @@ contract BetokenFund is
      * @param _orderAddress address of the CompoundOrder to be sold
      */
     function sellLeftoverCompoundOrder(address payable _orderAddress) public {
-        (bool success, ) = betokenLogic2.delegatecall(
+        (bool success, ) = peakdefiLogic2.delegatecall(
             abi.encodeWithSelector(
                 this.sellLeftoverCompoundOrder.selector,
                 _orderAddress
@@ -625,11 +625,11 @@ contract BetokenFund is
     }
 
     /**
-     * @notice Burns the Kairo balance of a manager who has been inactive for a certain number of cycles
-     * @param _deadman the manager whose Kairo balance will be burned
+     * @notice Burns the RepToken balance of a manager who has been inactive for a certain number of cycles
+     * @param _deadman the manager whose RepToken balance will be burned
      */
     function burnDeadman(address _deadman) public {
-        (bool success, ) = betokenLogic.delegatecall(
+        (bool success, ) = peakdefiLogic.delegatecall(
             abi.encodeWithSelector(this.burnDeadman.selector, _deadman)
         );
         if (!success) {
@@ -651,7 +651,7 @@ contract BetokenFund is
         uint256 _salt,
         bytes calldata _signature
     ) external {
-        (bool success, ) = betokenLogic.delegatecall(
+        (bool success, ) = peakdefiLogic.delegatecall(
             abi.encodeWithSelector(
                 this.createInvestmentWithSignature.selector,
                 _tokenAddress,
@@ -680,7 +680,7 @@ contract BetokenFund is
         uint256 _salt,
         bytes calldata _signature
     ) external {
-        (bool success, ) = betokenLogic.delegatecall(
+        (bool success, ) = peakdefiLogic.delegatecall(
             abi.encodeWithSelector(
                 this.sellInvestmentWithSignature.selector,
                 _investmentId,
@@ -709,7 +709,7 @@ contract BetokenFund is
         uint256 _salt,
         bytes calldata _signature
     ) external {
-        (bool success, ) = betokenLogic.delegatecall(
+        (bool success, ) = peakdefiLogic.delegatecall(
             abi.encodeWithSelector(
                 this.createCompoundOrderWithSignature.selector,
                 _orderType,
@@ -735,7 +735,7 @@ contract BetokenFund is
         uint256 _salt,
         bytes calldata _signature
     ) external {
-        (bool success, ) = betokenLogic.delegatecall(
+        (bool success, ) = peakdefiLogic.delegatecall(
             abi.encodeWithSelector(
                 this.sellCompoundOrderWithSignature.selector,
                 _orderId,
@@ -753,16 +753,16 @@ contract BetokenFund is
 
     function repayCompoundOrderWithSignature(
         uint256 _orderId,
-        uint256 _repayAmountInDAI,
+        uint256 _repayAmountInUSDC,
         address _manager,
         uint256 _salt,
         bytes calldata _signature
     ) external {
-        (bool success, ) = betokenLogic.delegatecall(
+        (bool success, ) = peakdefiLogic.delegatecall(
             abi.encodeWithSelector(
                 this.repayCompoundOrderWithSignature.selector,
                 _orderId,
-                _repayAmountInDAI,
+                _repayAmountInUSDC,
                 _manager,
                 _salt,
                 _signature
@@ -776,7 +776,7 @@ contract BetokenFund is
     /**
      * @notice Creates a new investment for an ERC20 token.
      * @param _tokenAddress address of the ERC20 token contract
-     * @param _stake amount of Kairos to be staked in support of the investment
+     * @param _stake amount of RepTokens to be staked in support of the investment
      * @param _maxPrice the maximum price for the trade
      */
     function createInvestment(
@@ -784,7 +784,7 @@ contract BetokenFund is
         uint256 _stake,
         uint256 _maxPrice
     ) public {
-        (bool success, ) = betokenLogic.delegatecall(
+        (bool success, ) = peakdefiLogic.delegatecall(
             abi.encodeWithSelector(
                 this.createInvestment.selector,
                 _tokenAddress,
@@ -800,7 +800,7 @@ contract BetokenFund is
     /**
      * @notice Creates a new investment for an ERC20 token.
      * @param _tokenAddress address of the ERC20 token contract
-     * @param _stake amount of Kairos to be staked in support of the investment
+     * @param _stake amount of RepTokens to be staked in support of the investment
      * @param _maxPrice the maximum price for the trade
      * @param _calldata calldata for 1inch trading
      * @param _useKyber true for Kyber Network, false for 1inch
@@ -813,7 +813,7 @@ contract BetokenFund is
         bytes memory _calldata,
         bool _useKyber
     ) public {
-        (bool success, ) = betokenLogic.delegatecall(
+        (bool success, ) = peakdefiLogic.delegatecall(
             abi.encodeWithSelector(
                 this.createInvestmentV2.selector,
                 _sender,
@@ -830,7 +830,7 @@ contract BetokenFund is
     }
 
     /**
-     * @notice Called by user to sell the assets an investment invested in. Returns the staked Kairo plus rewards/penalties to the user.
+     * @notice Called by user to sell the assets an investment invested in. Returns the staked RepToken plus rewards/penalties to the user.
      *         The user can sell only part of the investment by changing _tokenAmount.
      * @dev When selling only part of an investment, the old investment would be "fully" sold and a new investment would be created with
      *   the original buy price and however much tokens that are not sold.
@@ -843,7 +843,7 @@ contract BetokenFund is
         uint256 _tokenAmount,
         uint256 _minPrice
     ) public {
-        (bool success, ) = betokenLogic.delegatecall(
+        (bool success, ) = peakdefiLogic.delegatecall(
             abi.encodeWithSelector(
                 this.sellInvestmentAsset.selector,
                 _investmentId,
@@ -857,7 +857,7 @@ contract BetokenFund is
     }
 
     /**
-     * @notice Called by user to sell the assets an investment invested in. Returns the staked Kairo plus rewards/penalties to the user.
+     * @notice Called by user to sell the assets an investment invested in. Returns the staked RepToken plus rewards/penalties to the user.
      *         The user can sell only part of the investment by changing _tokenAmount.
      * @dev When selling only part of an investment, the old investment would be "fully" sold and a new investment would be created with
      *   the original buy price and however much tokens that are not sold.
@@ -873,7 +873,7 @@ contract BetokenFund is
         bytes memory _calldata,
         bool _useKyber
     ) public {
-        (bool success, ) = betokenLogic.delegatecall(
+        (bool success, ) = peakdefiLogic.delegatecall(
             abi.encodeWithSelector(
                 this.sellInvestmentAssetV2.selector,
                 _sender,
@@ -893,7 +893,7 @@ contract BetokenFund is
      * @notice Creates a new Compound order to either short or leverage long a token.
      * @param _orderType true for a short order, false for a levarage long order
      * @param _tokenAddress address of the Compound token to be traded
-     * @param _stake amount of Kairos to be staked
+     * @param _stake amount of RepTokens to be staked
      * @param _minPrice the minimum token price for the trade
      * @param _maxPrice the maximum token price for the trade
      */
@@ -905,7 +905,7 @@ contract BetokenFund is
         uint256 _minPrice,
         uint256 _maxPrice
     ) public {
-        (bool success, ) = betokenLogic.delegatecall(
+        (bool success, ) = peakdefiLogic.delegatecall(
             abi.encodeWithSelector(
                 this.createCompoundOrder.selector,
                 _sender,
@@ -933,7 +933,7 @@ contract BetokenFund is
         uint256 _minPrice,
         uint256 _maxPrice
     ) public {
-        (bool success, ) = betokenLogic.delegatecall(
+        (bool success, ) = peakdefiLogic.delegatecall(
             abi.encodeWithSelector(
                 this.sellCompoundOrder.selector,
                 _sender,
@@ -950,19 +950,19 @@ contract BetokenFund is
     /**
      * @notice Repys debt for a Compound order to prevent the collateral ratio from dropping below threshold.
      * @param _orderId the ID of the Compound order
-     * @param _repayAmountInDAI amount of DAI to use for repaying debt
+     * @param _repayAmountInUSDC amount of USDC to use for repaying debt
      */
     function repayCompoundOrder(
         address _sender,
         uint256 _orderId,
-        uint256 _repayAmountInDAI
+        uint256 _repayAmountInUSDC
     ) public {
-        (bool success, ) = betokenLogic.delegatecall(
+        (bool success, ) = peakdefiLogic.delegatecall(
             abi.encodeWithSelector(
                 this.repayCompoundOrder.selector,
                 _sender,
                 _orderId,
-                _repayAmountInDAI
+                _repayAmountInUSDC
             )
         );
         if (!success) {
@@ -1019,13 +1019,13 @@ contract BetokenFund is
 
     /**
      * @notice Returns the commission balance of `_referrer`
-     * @return the commission balance and the received penalty, denoted in DAI
+     * @return the commission balance and the received penalty, denoted in USDC
      */
     function peakReferralCommissionBalanceOf(address _referrer)
         public
         returns (uint256 _commission)
     {
-        (bool success, bytes memory result) = betokenLogic3.delegatecall(
+        (bool success, bytes memory result) = peakdefiLogic3.delegatecall(
             abi.encodeWithSelector(
                 this.peakReferralCommissionBalanceOf.selector,
                 _referrer
@@ -1039,13 +1039,13 @@ contract BetokenFund is
 
     /**
      * @notice Returns the commission amount received by `_referrer` in the `_cycle`th cycle
-     * @return the commission amount and the received penalty, denoted in DAI
+     * @return the commission amount and the received penalty, denoted in USDC
      */
     function peakReferralCommissionOfAt(address _referrer, uint256 _cycle)
         public
         returns (uint256 _commission)
     {
-        (bool success, bytes memory result) = betokenLogic3.delegatecall(
+        (bool success, bytes memory result) = peakdefiLogic3.delegatecall(
             abi.encodeWithSelector(
                 this.peakReferralCommissionOfAt.selector,
                 _referrer,
@@ -1062,7 +1062,7 @@ contract BetokenFund is
      * @notice Redeems commission.
      */
     function peakReferralRedeemCommission() public {
-        (bool success, ) = betokenLogic3.delegatecall(
+        (bool success, ) = peakdefiLogic3.delegatecall(
             abi.encodeWithSelector(this.peakReferralRedeemCommission.selector)
         );
         if (!success) {
@@ -1076,7 +1076,7 @@ contract BetokenFund is
      *        Commissions for a cycle will be redeemed during the Intermission phase of the next cycle, so _cycle must < cycleNumber.
      */
     function peakReferralRedeemCommissionForCycle(uint256 _cycle) public {
-        (bool success, ) = betokenLogic3.delegatecall(
+        (bool success, ) = peakdefiLogic3.delegatecall(
             abi.encodeWithSelector(
                 this.peakReferralRedeemCommissionForCycle.selector,
                 _cycle

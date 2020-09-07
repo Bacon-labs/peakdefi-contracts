@@ -7,11 +7,11 @@ async function main () {
   const accounts = await env.web3.eth.getAccounts()
   const bnToString = (bn) => BigNumber(bn).toFixed(0)
 
-  const BetokenFactory = env.artifacts.require('BetokenFactory')
-  const BetokenFund = env.artifacts.require('BetokenFund')
-  const BetokenLogic = env.artifacts.require('BetokenLogic')
-  const BetokenLogic2 = env.artifacts.require('BetokenLogic2')
-  const BetokenLogic3 = env.artifacts.require('BetokenLogic3')
+  const PeakDeFiFactory = env.artifacts.require('PeakDeFiFactory')
+  const PeakDeFiFund = env.artifacts.require('PeakDeFiFund')
+  const PeakDeFiLogic = env.artifacts.require('PeakDeFiLogic')
+  const PeakDeFiLogic2 = env.artifacts.require('PeakDeFiLogic2')
+  const PeakDeFiLogic3 = env.artifacts.require('PeakDeFiLogic3')
   const MiniMeTokenFactory = env.artifacts.require('MiniMeTokenFactory')
 
   const CompoundOrderFactory = env.artifacts.require('CompoundOrderFactory')
@@ -26,13 +26,13 @@ async function main () {
   const TestToken = env.artifacts.require('TestToken')
   const TestUniswapOracle = env.artifacts.require('TestUniswapOracle')
 
-  // deploy template BetokenFund
-  const betokenFundTemplate = await BetokenFund.new()
+  // deploy template PeakDeFiFund
+  const peakdefiFundTemplate = await PeakDeFiFund.new()
 
-  // deploy BetokenLogic
-  const betokenLogic = await BetokenLogic.new()
-  const betokenLogic2 = await BetokenLogic2.new()
-  const betokenLogic3 = await BetokenLogic3.new()
+  // deploy PeakDeFiLogic
+  const peakdefiLogic = await PeakDeFiLogic.new()
+  const peakdefiLogic2 = await PeakDeFiLogic2.new()
+  const peakdefiLogic3 = await PeakDeFiLogic3.new()
 
   // deploy MiniMeTokenFactory
   const miniMeTokenFactory = await MiniMeTokenFactory.new()
@@ -47,7 +47,7 @@ async function main () {
 
   // deploy PeakStaking, PeakReward
   const peakStaking = await PeakStaking.new(peakToken.address)
-  const peakReward = await PeakReward.new(config.MARKETPEAK_WALLET_ADDR, peakStaking.address, peakToken.address, config.DAI_ADDR, oracle.address)
+  const peakReward = await PeakReward.new(config.MARKETPEAK_WALLET_ADDR, peakStaking.address, peakToken.address, config.USDC_ADDR, oracle.address)
   await peakStaking.init(peakReward.address)
   await peakReward.addSigner(peakStaking.address)
   console.log(`Deployed PeakStaking at ${peakStaking.address}`)
@@ -57,23 +57,23 @@ async function main () {
   await peakToken.addMinter(peakStaking.address)
   await peakToken.addMinter(peakReward.address)
 
-  // deploy BetokenFactory
-  const betokenFactory = await BetokenFactory.new(
-    config.DAI_ADDR,
+  // deploy PeakDeFiFactory
+  const peakdefiFactory = await PeakDeFiFactory.new(
+    config.USDC_ADDR,
     config.KYBER_ADDR,
     ZERO_ADDR,
-    betokenFundTemplate.address,
-    betokenLogic.address,
-    betokenLogic2.address,
-    betokenLogic3.address,
+    peakdefiFundTemplate.address,
+    peakdefiLogic.address,
+    peakdefiLogic2.address,
+    peakdefiLogic3.address,
     peakReward.address,
     peakStaking.address,
     miniMeTokenFactory.address
   )
 
-  await peakReward.addSigner(betokenFactory.address)
+  await peakReward.addSigner(peakdefiFactory.address)
 
-  console.log(`Deployed BetokenFactory at ${betokenFactory.address}`)
+  console.log(`Deployed PeakDeFiFactory at ${peakdefiFactory.address}`)
 
   // deploy Compound order templates
   // deploy ShortCERC20Order
@@ -98,11 +98,11 @@ async function main () {
     ShortCEtherOrderContract.address,
     LongCERC20OrderContract.address,
     LongCEtherOrderContract.address,
-    config.DAI_ADDR,
+    config.USDC_ADDR,
     config.KYBER_ADDR,
     config.COMPOUND_COMPTROLLER_ADDR,
     config.COMPOUND_ORACLE_ADDR,
-    config.COMPOUND_CDAI_ADDR,
+    config.COMPOUND_CUSDC_ADDR,
     config.COMPOUND_CETH_ADDR
   )
 

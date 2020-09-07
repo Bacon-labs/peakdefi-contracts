@@ -26,14 +26,14 @@ contract Utils {
     _;
   }
 
-  address public DAI_ADDR;
+  address public USDC_ADDR;
   address payable public KYBER_ADDR;
   address payable public ONEINCH_ADDR;
 
   bytes public constant PERM_HINT = "PERM";
 
   ERC20Detailed internal constant ETH_TOKEN_ADDRESS = ERC20Detailed(0x00eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee);
-  ERC20Detailed internal dai;
+  ERC20Detailed internal usdc;
   KyberNetwork internal kyber;
 
   uint constant internal PRECISION = (10**18);
@@ -42,15 +42,15 @@ contract Utils {
   uint constant internal MAX_DECIMALS = 18;
 
   constructor(
-    address _daiAddr,
+    address _usdcAddr,
     address payable _kyberAddr,
     address payable _oneInchAddr
   ) public {
-    DAI_ADDR = _daiAddr;
+    USDC_ADDR = _usdcAddr;
     KYBER_ADDR = _kyberAddr;
     ONEINCH_ADDR = _oneInchAddr;
 
-    dai = ERC20Detailed(_daiAddr);
+    usdc = ERC20Detailed(_usdcAddr);
     kyber = KyberNetwork(_kyberAddr);
   }
 

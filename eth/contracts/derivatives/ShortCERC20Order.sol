@@ -7,7 +7,7 @@ contract ShortCERC20Order is CompoundOrder {
     // Ensure token's price is between _minPrice and _maxPrice
     uint256 tokenPrice = ORACLE.getUnderlyingPrice(compoundTokenAddr); // Get the shorting token's price in ETH
     require(tokenPrice > 0); // Ensure asset exists on Compound
-    tokenPrice = __tokenToDAI(CETH_ADDR, tokenPrice); // Convert token price to be in DAI
+    tokenPrice = __tokenToUSDC(CETH_ADDR, tokenPrice); // Convert token price to be in USDC
     require(tokenPrice >= _minPrice && tokenPrice <= _maxPrice); // Ensure price is within range
     _;
   }
@@ -20,30 +20,30 @@ contract ShortCERC20Order is CompoundOrder {
   {
     buyTime = now;
 
-    // Get funds in DAI from BetokenFund
-    dai.safeTransferFrom(owner(), address(this), collateralAmountInDAI); // Transfer DAI from BetokenFund
+    // Get funds in USDC from PeakDeFiFund
+    usdc.safeTransferFrom(owner(), address(this), collateralAmountInUSDC); // Transfer USDC from PeakDeFiFund
 
     // Enter Compound markets
     CERC20 market = CERC20(compoundTokenAddr);
     address[] memory markets = new address[](2);
     markets[0] = compoundTokenAddr;
-    markets[1] = address(CDAI);
+    markets[1] = address(CUSDC);
     uint[] memory errors = COMPTROLLER.enterMarkets(markets);
     require(errors[0] == 0 && errors[1] == 0);
     
     // Get loan from Compound in tokenAddr
-    uint256 loanAmountInToken = __daiToToken(compoundTokenAddr, loanAmountInDAI);
-    dai.safeApprove(address(CDAI), 0); // Clear DAI allowance of Compound DAI market
-    dai.safeApprove(address(CDAI), collateralAmountInDAI); // Approve DAI transfer to Compound DAI market
-    require(CDAI.mint(collateralAmountInDAI) == 0); // Transfer DAI into Compound as supply
-    dai.safeApprove(address(CDAI), 0);
+    uint256 loanAmountInToken = __usdcToToken(compoundTokenAddr, loanAmountInUSDC);
+    usdc.safeApprove(address(CUSDC), 0); // Clear USDC allowance of Compound USDC market
+    usdc.safeApprove(address(CUSDC), collateralAmountInUSDC); // Approve USDC transfer to Compound USDC market
+    require(CUSDC.mint(collateralAmountInUSDC) == 0); // Transfer USDC into Compound as supply
+    usdc.safeApprove(address(CUSDC), 0);
     require(market.borrow(loanAmountInToken) == 0);// Take out loan
-    (bool negLiquidity, ) = getCurrentLiquidityInDAI();
+    (bool negLiquidity, ) = getCurrentLiquidityInUSDC();
     require(!negLiquidity); // Ensure account liquidity is positive
 
-    // Convert loaned tokens to DAI
-    (uint256 actualDAIAmount,) = __sellTokenForDAI(loanAmountInToken);
-    loanAmountInDAI = actualDAIAmount; // Change loan amount to actual DAI received
+    // Convert loaned tokens to USDC
+    (uint256 actualUSDCAmount,) = __sellTokenForUSDC(loanAmountInToken);
+    loanAmountInUSDC = actualUSDCAmount; // Change loan amount to actual USDC received
 
     // Repay leftover tokens to avoid complications
     ERC20Detailed token = __underlyingToken(compoundTokenAddr);
@@ -66,14 +66,14 @@ contract ShortCERC20Order is CompoundOrder {
     require(isSold == false);
     isSold = true;
 
-    // Siphon remaining collateral by repaying x DAI and getting back 1.5x DAI collateral
+    // Siphon remaining collateral by repaying x USDC and getting back 1.5x USDC collateral
     // Repeat to ensure debt is exhausted
     for (uint256 i = 0; i < MAX_REPAY_STEPS; i = i.add(1)) {
-      uint256 currentDebt = getCurrentBorrowInDAI();
+      uint256 currentDebt = getCurrentBorrowInUSDC();
       if (currentDebt > NEGLIGIBLE_DEBT) {
         // Determine amount to be repaid this step
-        uint256 currentBalance = getCurrentCashInDAI();
-        uint256 repayAmount = 0; // amount to be repaid in DAI
+        uint256 currentBalance = getCurrentCashInUSDC();
+        uint256 repayAmount = 0; // amount to be repaid in USDC
         if (currentDebt <= currentBalance) {
           // Has enough money, repay all debt
           repayAmount = currentDebt;
@@ -87,17 +87,17 @@ contract ShortCERC20Order is CompoundOrder {
       }
 
       // Withdraw all available liquidity
-      (bool isNeg, uint256 liquidity) = getCurrentLiquidityInDAI();
+      (bool isNeg, uint256 liquidity) = getCurrentLiquidityInUSDC();
       if (!isNeg) {
-        uint256 errorCode = CDAI.redeemUnderlying(liquidity.mul(PRECISION.sub(DEFAULT_LIQUIDITY_SLIPPAGE)).div(PRECISION));
+        uint256 errorCode = CUSDC.redeemUnderlying(liquidity.mul(PRECISION.sub(DEFAULT_LIQUIDITY_SLIPPAGE)).div(PRECISION));
         if (errorCode != 0) {
           // error
           // try again with fallback slippage
-          errorCode = CDAI.redeemUnderlying(liquidity.mul(PRECISION.sub(FALLBACK_LIQUIDITY_SLIPPAGE)).div(PRECISION));
+          errorCode = CUSDC.redeemUnderlying(liquidity.mul(PRECISION.sub(FALLBACK_LIQUIDITY_SLIPPAGE)).div(PRECISION));
           if (errorCode != 0) {
             // error
             // try again with max slippage
-            CDAI.redeemUnderlying(liquidity.mul(PRECISION.sub(MAX_LIQUIDITY_SLIPPAGE)).div(PRECISION));
+            CUSDC.redeemUnderlying(liquidity.mul(PRECISION.sub(MAX_LIQUIDITY_SLIPPAGE)).div(PRECISION));
           }
         }
       }
@@ -107,19 +107,19 @@ contract ShortCERC20Order is CompoundOrder {
       }
     }
 
-    // Send DAI back to BetokenFund and return
-    _inputAmount = collateralAmountInDAI;
-    _outputAmount = dai.balanceOf(address(this));
+    // Send USDC back to PeakDeFiFund and return
+    _inputAmount = collateralAmountInUSDC;
+    _outputAmount = usdc.balanceOf(address(this));
     outputAmount = _outputAmount;
-    dai.safeTransfer(owner(), dai.balanceOf(address(this)));
+    usdc.safeTransfer(owner(), usdc.balanceOf(address(this)));
   }
 
   // Allows manager to repay loan to avoid liquidation
-  function repayLoan(uint256 _repayAmountInDAI) public onlyOwner {
+  function repayLoan(uint256 _repayAmountInUSDC) public onlyOwner {
     require(buyTime > 0); // Ensure the order has been executed
 
-    // Convert DAI to shorting token
-    (,uint256 actualTokenAmount) = __sellDAIForToken(_repayAmountInDAI);
+    // Convert USDC to shorting token
+    (,uint256 actualTokenAmount) = __sellUSDCForToken(_repayAmountInUSDC);
 
     // Check if amount is greater than borrow balance
     CERC20 market = CERC20(compoundTokenAddr);
@@ -137,23 +137,23 @@ contract ShortCERC20Order is CompoundOrder {
   }
 
   function getMarketCollateralFactor() public view returns (uint256) {
-    (, uint256 ratio) = COMPTROLLER.markets(address(CDAI));
+    (, uint256 ratio) = COMPTROLLER.markets(address(CUSDC));
     return ratio;
   }
 
-  function getCurrentCollateralInDAI() public returns (uint256 _amount) {
-    uint256 supply = CDAI.balanceOf(address(this)).mul(CDAI.exchangeRateCurrent()).div(PRECISION);
+  function getCurrentCollateralInUSDC() public returns (uint256 _amount) {
+    uint256 supply = CUSDC.balanceOf(address(this)).mul(CUSDC.exchangeRateCurrent()).div(PRECISION);
     return supply;
   }
 
-  function getCurrentBorrowInDAI() public returns (uint256 _amount) {
+  function getCurrentBorrowInUSDC() public returns (uint256 _amount) {
     CERC20 market = CERC20(compoundTokenAddr);
-    uint256 borrow = __tokenToDAI(compoundTokenAddr, market.borrowBalanceCurrent(address(this)));
+    uint256 borrow = __tokenToUSDC(compoundTokenAddr, market.borrowBalanceCurrent(address(this)));
     return borrow;
   }
 
-  function getCurrentCashInDAI() public view returns (uint256 _amount) {
-    uint256 cash = getBalance(dai, address(this));
+  function getCurrentCashInUSDC() public view returns (uint256 _amount) {
+    uint256 cash = getBalance(usdc, address(this));
     return cash;
   }
 }
