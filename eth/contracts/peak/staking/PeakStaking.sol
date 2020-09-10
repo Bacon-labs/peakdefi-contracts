@@ -17,6 +17,7 @@ contract PeakStaking {
         uint256 stakeTimeInDays,
         uint256 interestAmount
     );
+    event ReceiveStakeReward(uint256 idx, address user, uint256 rewardAmount);
     event WithdrawReward(uint256 idx, address user, uint256 rewardAmount);
     event WithdrawStake(uint256 idx, address user);
 
@@ -134,7 +135,7 @@ contract PeakStaking {
                 rawCommission.sub(leftoverAmount).add(referralStakerBonus)
             );
 
-            emit WithdrawReward(stakeIdx, msg.sender, referralStakerBonus);
+            emit ReceiveStakeReward(stakeIdx, msg.sender, referralStakerBonus);
         }
 
         require(mintedPeakTokens <= PEAK_MINT_CAP, "PeakStaking: reached cap");
@@ -142,7 +143,7 @@ contract PeakStaking {
         emit CreateStake(
             stakeIdx,
             msg.sender,
-            referrer,
+            actualReferrer,
             stakeAmount,
             stakeTimeInDays,
             interestAmount
