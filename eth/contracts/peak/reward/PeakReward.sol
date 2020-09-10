@@ -16,7 +16,7 @@ contract PeakReward is SignerRole {
     event RankChange(address user, uint256 oldRank, uint256 newRank);
     event PayCommission(
         address referrer,
-        address receipient,
+        address recipient,
         address token,
         uint256 amount,
         uint8 level
