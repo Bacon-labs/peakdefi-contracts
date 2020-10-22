@@ -109,7 +109,7 @@ contract PeakDeFiLogic is
         // Signature valid, record use of salt
         hasUsedSalt[_manager][_salt] = true;
 
-        createInvestmentV2(
+        this.createInvestmentV2(
             _manager,
             _tokenAddress,
             _stake,
@@ -177,7 +177,7 @@ contract PeakDeFiLogic is
         // Signature valid, record use of salt
         hasUsedSalt[_manager][_salt] = true;
 
-        sellInvestmentAssetV2(
+        this.sellInvestmentAssetV2(
             _manager,
             _investmentId,
             _tokenAmount,
@@ -462,7 +462,7 @@ contract PeakDeFiLogic is
         // Signature valid, record use of salt
         hasUsedSalt[_manager][_salt] = true;
 
-        createCompoundOrder(
+        this.createCompoundOrder(
             _manager,
             _orderType,
             _tokenAddress,
@@ -497,7 +497,7 @@ contract PeakDeFiLogic is
         // Signature valid, record use of salt
         hasUsedSalt[_manager][_salt] = true;
 
-        sellCompoundOrder(_manager, _orderId, _minPrice, _maxPrice);
+        this.sellCompoundOrder(_manager, _orderId, _minPrice, _maxPrice);
     }
 
     function repayCompoundOrderWithSignature(
@@ -524,7 +524,7 @@ contract PeakDeFiLogic is
         // Signature valid, record use of salt
         hasUsedSalt[_manager][_salt] = true;
 
-        repayCompoundOrder(_manager, _orderId, _repayAmountInUSDC);
+        this.repayCompoundOrder(_manager, _orderId, _repayAmountInUSDC);
     }
 
     /**
