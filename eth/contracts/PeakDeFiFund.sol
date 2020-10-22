@@ -171,6 +171,7 @@ contract PeakDeFiFund is
     {
         cToken.transferOwnership(nextVersion);
         sToken.transferOwnership(nextVersion);
+        peakReferralToken.transferOwnership(nextVersion);
         proxy.updatePeakDeFiFundAddress();
     }
 
