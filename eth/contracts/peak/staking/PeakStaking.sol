@@ -240,9 +240,10 @@ contract PeakStaking {
         pure
         returns (uint256)
     {
-        return
-            PRECISION.sub(
-                INTEREST_SLOPE.mul(_mintedPeakTokens).div(PEAK_PRECISION)
-            );
+        uint256 tmp = INTEREST_SLOPE.mul(_mintedPeakTokens).div(PEAK_PRECISION);
+        if (tmp > PRECISION) {
+            return 0;
+        }
+        return PRECISION.sub(tmp);
     }
 }
